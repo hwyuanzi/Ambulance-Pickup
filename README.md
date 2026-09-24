@@ -72,3 +72,15 @@ Completed competitions are readable JSON files in `results/<id>.json` (ignored
 by Git). Each file contains the input, team names and commands, full runner
 diagnostics and validation result, and the serialized map view. Reopening one
 reads this file without running submissions again.
+
+## 300-patient rehearsal
+
+The fixed [rehearsal input](examples/rehearsal_300_input.txt) contains 300
+patients across coordinates 0–100, deadlines 50–450, and five hospitals with
+20 ambulances total. [Rehearsal teams](examples/rehearsal_teams.json) configure
+valid baseline and weaker solvers, plus invalid, crashing, and timeout programs
+in [one submission script](examples/rehearsal_team.py). To repeat the exercise,
+start the viewer, paste the input and team JSON into the matching dashboard
+fields, and click **Start competition**. The timeout team uses the normal
+120-second runner limit; the entire five-team run takes about two minutes.
+Saved runs can be reopened from **Saved results** without rerunning teams.
