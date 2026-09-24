@@ -141,7 +141,7 @@ class RunApiTests(unittest.TestCase):
             return json.load(response)
 
     def test_success_uses_runner_validation_for_view(self):
-        with patch("ambulance.server.validate", side_effect=AssertionError("duplicate validation")):
+        with patch("ambulance.view.validate", side_effect=AssertionError("duplicate validation")):
             payload = self.request("import pathlib,sys\n"
                                    "pathlib.Path(sys.argv[-1]).write_text('H1:0,0\\n0 A1 H1 P1 H1\\n')\n"
                                    "print('x' * 17000)\n")

@@ -1,0 +1,7 @@
+{
+  "teams": [
+    {"name": "Full rescue", "command": "python3 ./examples/submission.py"},
+    {"name": "One rescue", "command": "python3 ./examples/competition_demo.py partial"},
+    {"name": "Invalid route", "command": "python3 ./examples/competition_demo.py invalid"}
+  ]
+}

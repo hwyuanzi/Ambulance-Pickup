@@ -6,6 +6,8 @@ const state = { data: null, selectedRoute: null, selectedPatient: null };
 let revision = 0;
 let validationRun = 0;
 let submissionRun = 0;
+let currentCompetition = null;
+let selectedTeamIndex = null;
 
 function svg(tag, attrs = {}, text = null) {
   const node = document.createElementNS(SVG_NS, tag);
@@ -371,9 +373,139 @@ async function runSubmission() {
   }
 }
 
+function renderLeaderboard(summary) {
+  const list = $("leaderboard");
+  clear(list);
+  for (const team of summary.teams) {
+    const row = document.createElement("button");
+    row.type = "button";
+    row.className = `leaderboard-row${selectedTeamIndex === team.index ? " selected" : ""}`;
+    const name = document.createElement("strong");
+    name.textContent = team.name;
+    const status = document.createElement("span");
+    status.className = team.status === "completed" ? "" : "failed";
+    status.textContent = team.status;
+    const score = document.createElement("span");
+    score.className = "score";
+    score.textContent = team.score === null ? "—" : String(team.score);
+    const elapsed = document.createElement("span");
+    elapsed.className = "elapsed";
+    elapsed.textContent = `${team.elapsed_seconds.toFixed(3)} s`;
+    row.append(name, status, score, elapsed);
+    row.addEventListener("click", () => openTeam(team.index));
+    list.append(row);
+  }
+}
+
+async function openTeam(index) {
+  if (!currentCompetition) return;
+  const competition = currentCompetition;
+  const currentRevision = ++revision;
+  selectedTeamIndex = index;
+  renderLeaderboard(competition);
+  try {
+    const response = await fetch(`/api/competitions/${competition.id}/teams/${index}`);
+    const team = await response.json();
+    if (!response.ok) throw new Error(team.error || `HTTP ${response.status}`);
+    if (currentRevision !== revision) return;
+    $("input-text").value = team.input;
+    $("solution-text").value = team.run.solution_text || "";
+    setIdle(`Viewing ${team.name}`);
+    const run = { ...team.run };
+    for (const stream of ["stdout", "stderr"]) {
+      run[`${stream}_truncated`] = run[stream].length > 16000;
+      run[stream] = run[stream].slice(0, 16000);
+    }
+    renderDiagnostics(run);
+    if (team.view) {
+      state.data = team.view;
+      state.selectedRoute = team.view.routes[0]?.id || null;
+      state.selectedPatient = null;
+      render();
+    } else {
+      setText("status-value", team.run.status.toUpperCase());
+      setText("status-foot", team.run.error || "No validated solution is available");
+      $("status-tile").classList.add("invalid");
+    }
+    setText("competition-message", `Viewing ${team.name} · saved ${competition.created_at}`);
+  } catch (error) {
+    if (currentRevision === revision) setText("competition-message", `Could not load team: ${error.message}`);
+  }
+}
+
+async function showCompetition(summary) {
+  currentCompetition = summary;
+  selectedTeamIndex = null;
+  $("saved-competitions").value = summary.id;
+  renderLeaderboard(summary);
+  setText("competition-message", `${summary.teams.length} teams · saved ${summary.created_at}`);
+  const first = summary.teams.find((team) => team.status === "completed");
+  if (first) await openTeam(first.index);
+}
+
+async function refreshSavedCompetitions() {
+  const response = await fetch("/api/competitions");
+  const data = await response.json();
+  if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
+  const select = $("saved-competitions");
+  clear(select);
+  select.append(new Option("Select a competition", ""));
+  for (const item of data.competitions) {
+    select.append(new Option(`${item.created_at} · ${item.teams.length} teams`, item.id));
+  }
+  if (currentCompetition) select.value = currentCompetition.id;
+}
+
+async function loadCompetitionExample() {
+  try {
+    const response = await fetch("/api/competitions/example");
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
+    $("competition-config").value = JSON.stringify(data, null, 2);
+  } catch (error) {
+    setText("competition-message", `Could not load demo teams: ${error.message}`);
+  }
+}
+
+async function startCompetition() {
+  const button = $("run-competition");
+  button.disabled = true;
+  button.textContent = "Running teams…";
+  setText("competition-message", "Running teams sequentially. This may take up to 120 seconds per team.");
+  try {
+    const config = JSON.parse($("competition-config").value);
+    const response = await fetch("/api/competitions", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...config, input: $("input-text").value }),
+    });
+    const summary = await response.json();
+    if (!response.ok) throw new Error(summary.error || `HTTP ${response.status}`);
+    currentCompetition = summary;
+    await refreshSavedCompetitions();
+    await showCompetition(summary);
+  } catch (error) {
+    setText("competition-message", `Competition failed: ${error.message}`);
+  } finally {
+    button.disabled = false;
+    button.textContent = "Start competition";
+  }
+}
+
 $("validate").addEventListener("click", validateCurrent);
 $("load-example").addEventListener("click", loadExample);
 $("run-submission").addEventListener("click", runSubmission);
+$("run-competition").addEventListener("click", startCompetition);
+$("saved-competitions").addEventListener("change", async (event) => {
+  if (!event.target.value) return;
+  try {
+    const response = await fetch(`/api/competitions/${event.target.value}`);
+    const summary = await response.json();
+    if (!response.ok) throw new Error(summary.error || `HTTP ${response.status}`);
+    await showCompetition(summary);
+  } catch (error) {
+    setText("competition-message", `Could not open competition: ${error.message}`);
+  }
+});
 for (const id of ["input-text", "solution-text"]) $(id).addEventListener("input", () => {
   revision++;
   setIdle("Changes need validation");
@@ -381,3 +513,5 @@ for (const id of ["input-text", "solution-text"]) $(id).addEventListener("input"
 });
 setIdle();
 loadExample();
+loadCompetitionExample();
+refreshSavedCompetitions().catch((error) => setText("competition-message", `Could not list saved results: ${error.message}`));

@@ -70,6 +70,15 @@
         <div class="diagnostics-streams"><div><h3>STDOUT <span id="stdout-truncated" hidden>· truncated</span></h3><pre id="run-stdout"></pre></div><div><h3>STDERR <span id="stderr-truncated" hidden>· truncated</span></h3><pre id="run-stderr"></pre></div></div>
       </section>
 
+      <section class="competition-card" aria-label="Competition mode">
+        <div class="competition-head"><div><div class="section-kicker">COMPETITION MODE</div><h2>Team leaderboard</h2><p>Run every configured team against the current input, one at a time.</p></div></div>
+        <label class="competition-label" for="competition-config">TEAM CONFIGURATION (JSON)</label>
+        <textarea id="competition-config" spellcheck="false" aria-label="Team configuration JSON"></textarea>
+        <div class="competition-controls"><button class="button primary" id="run-competition" type="button">Start competition</button><label for="saved-competitions">Saved results</label><select id="saved-competitions"><option value="">Select a competition</option></select></div>
+        <p class="competition-message" id="competition-message" aria-live="polite">Load the demo teams or enter your own configuration.</p>
+        <div id="leaderboard" class="leaderboard"><div class="placeholder">Completed competition results appear here.</div></div>
+      </section>
+
       <section class="error-card" id="error-card" hidden><div class="card-header"><div><div class="section-kicker">VALIDATION</div><h2>Issues to fix</h2></div></div><ul id="error-list"></ul></section>
 
       <section class="workspace">

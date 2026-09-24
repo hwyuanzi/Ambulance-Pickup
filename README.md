@@ -34,3 +34,41 @@ This organizer tool accepts run requests only from the local browser.
 See [the rules](docs/RULES.md) and [the text format](docs/FORMAT.md).
 
 The first single-submission runner is documented in [the runner contract](docs/RUNNER.md).
+
+## Competition Mode
+
+Start the viewer as above, then click **Start competition** in the **Team leaderboard**
+panel. The page loads three demo teams from [examples/competition.json](examples/competition.json)
+and uses the input currently in **Input & solution**. The demo produces scores of
+2 and 1, plus one invalid submission. Teams run sequentially; a competition is
+saved after every team finishes. The leaderboard lists valid completed teams by
+score descending, keeps unsuccessful teams visible with their statuses, and does
+not assign a tie break. Click a team to load its saved diagnostics and rescue map.
+Use **Saved results** to reopen a completed competition later.
+
+Edit the panel's JSON to configure your own teams:
+
+```json
+{
+  "teams": [
+    {"name": "My team", "command": "python3 ./my_submission.py"},
+    {"name": "Another team", "command": "/absolute/path/to/program --fast"}
+  ]
+}
+```
+
+Each name must be nonempty and unique. Commands use shell-style quoting to split
+arguments, but run directly without a shell. Paths beginning with `./` or `../`
+are resolved relative to the repository root; use an absolute path for programs
+elsewhere. The runner appends the same absolute input and output paths described
+in [the runner contract](docs/RUNNER.md). Each team gets the same input and the
+runner's 120-second limit.
+
+The dashboard uses `POST /api/competitions` with `{"input": "...", "teams": [...]}`
+to start a competition. `GET /api/competitions` lists saved summaries,
+`GET /api/competitions/<id>` loads a leaderboard, and
+`GET /api/competitions/<id>/teams/<index>` loads a team's saved run and map.
+Completed competitions are readable JSON files in `results/<id>.json` (ignored
+by Git). Each file contains the input, team names and commands, full runner
+diagnostics and validation result, and the serialized map view. Reopening one
+reads this file without running submissions again.

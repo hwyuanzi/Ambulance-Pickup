@@ -12,10 +12,11 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlsplit
 
-from .engine import initial_ambulance_locations
-from .parser import ParseError, parse_input, parse_solution
+from .competition import (CompetitionConfigError, competition_summary,
+                          list_competitions, load_competition, parse_teams, RESULTS_DIR,
+                          run_competition)
 from .runner import run_submission
-from .validator import ValidationReport, validate
+from .view import validation_payload
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -27,120 +28,6 @@ ASSETS = {
     "/style.css": ("style.css", "text/css; charset=utf-8"),
     "/app.js": ("app.js", "text/javascript; charset=utf-8"),
 }
-
-
-def validation_payload(input_text: str, solution_text: str, report: ValidationReport | None = None) -> dict:
-    """Render parsed geometry and the validator's authoritative result as JSON data."""
-    if report is None:
-        report = validate(input_text, solution_text)
-    try:
-        problem = parse_input(input_text)
-    except ParseError:
-        problem = None
-    try:
-        plan = parse_solution(solution_text)
-    except ParseError:
-        plan = None
-
-    placements = {item.hospital_id: item.position for item in plan.placements} if plan else {}
-    hospitals = [
-        {
-            "id": f"H{hospital.id}",
-            "x": placements[hospital.id].x if hospital.id in placements else None,
-            "y": placements[hospital.id].y if hospital.id in placements else None,
-            "ambulance_count": hospital.ambulance_count,
-        }
-        for hospital in problem.hospitals
-    ] if problem else []
-    ambulances = [
-        {"id": f"A{ambulance_id}", "initial_hospital": f"H{hospital_id}"}
-        for ambulance_id, hospital_id in initial_ambulance_locations(problem).items()
-    ] if problem else []
-
-    routes = []
-    patient_results = {}
-    if report.result is not None:
-        for index, event in enumerate(report.result.routes, 1):
-            pickups = [
-                {
-                    "patient_id": f"P{pickup.patient_id}",
-                    "arrival_time": pickup.arrival_time,
-                    "loading_complete_time": pickup.loading_complete_time,
-                }
-                for pickup in event.pickups
-            ]
-            outcomes = [
-                {
-                    "patient_id": f"P{outcome.patient_id}",
-                    "deadline": outcome.deadline,
-                    "delivery_time": outcome.delivery_time,
-                    "status": "rescued" if outcome.rescued else "late",
-                }
-                for outcome in event.outcomes
-            ]
-            for outcome in outcomes:
-                patient_results[outcome["patient_id"]] = {
-                    "status": outcome["status"],
-                    "delivery_time": outcome["delivery_time"],
-                    "route_id": f"R{index}",
-                }
-            routes.append({
-                "id": f"R{index}",
-                "source_line": event.source_line,
-                "ambulance_id": f"A{event.ambulance_id}",
-                "start_hospital": f"H{event.start_hospital}",
-                "start_time": event.start_time,
-                "pickups": pickups,
-                "travel_time": event.travel_time,
-                "loading_time": event.loading_time,
-                "destination_hospital": f"H{event.destination_hospital}",
-                "destination_arrival_time": event.destination_arrival_time,
-                "unloading_time": event.unloading_time,
-                "delivery_time": event.unload_complete_time,
-                "outcomes": outcomes,
-                "final_hospital": f"H{event.final_hospital}",
-                "next_available_time": event.next_available_time,
-            })
-
-    patients = [
-        {
-            "id": f"P{patient.id}",
-            "x": patient.position.x,
-            "y": patient.position.y,
-            "deadline": patient.deadline,
-            **patient_results.get(f"P{patient.id}", {
-                "status": "unvisited" if report.valid else "unknown",
-                "delivery_time": None,
-                "route_id": None,
-            }),
-        }
-        for patient in problem.patients
-    ] if problem else []
-
-    counts = None
-    if report.result is not None:
-        counts = {
-            "rescued": report.result.score,
-            "late": sum(patient["status"] == "late" for patient in patients),
-            "unvisited": sum(patient["status"] == "unvisited" for patient in patients),
-        }
-
-    return {
-        "valid": report.valid,
-        "status": "valid" if report.valid else "invalid",
-        "score": report.result.score if report.result is not None else None,
-        "patient_count": report.patient_count,
-        "counts": counts,
-        "route_count": len(routes) if report.valid else None,
-        "hospitals": hospitals,
-        "patients": patients,
-        "ambulances": ambulances,
-        "routes": routes,
-        "errors": [
-            {"source": issue.source, "line": issue.line, "message": issue.message}
-            for issue in report.issues
-        ],
-    }
 
 
 def run_payload(input_text: str, command: list[str]) -> dict:
@@ -158,6 +45,8 @@ def run_payload(input_text: str, command: list[str]) -> dict:
 
 
 class Handler(BaseHTTPRequestHandler):
+    results_dir = RESULTS_DIR
+
     def _send(self, code: HTTPStatus, body: bytes, content_type: str) -> None:
         self.send_response(code)
         self.send_header("Content-Type", content_type)
@@ -172,6 +61,32 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:
         path = urlsplit(self.path).path
+        if path == "/api/competitions/example":
+            try:
+                config = json.loads((ROOT / "examples/competition.json").read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError):
+                self._json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": "competition example unavailable"})
+                return
+            self._json(HTTPStatus.OK, config)
+            return
+        if path == "/api/competitions":
+            self._json(HTTPStatus.OK, {"competitions": list_competitions(results_dir=self.results_dir)})
+            return
+        if path.startswith("/api/competitions/"):
+            parts = path.split("/")
+            try:
+                record = load_competition(parts[3], results_dir=self.results_dir)
+                if len(parts) == 4:
+                    value = competition_summary(record)
+                elif len(parts) == 6 and parts[4] == "teams" and parts[5].isdigit():
+                    value = {"input": record["input"], **record["teams"][int(parts[5])]}
+                else:
+                    raise FileNotFoundError(path)
+            except (FileNotFoundError, IndexError):
+                self._json(HTTPStatus.NOT_FOUND, {"error": "competition or team not found"})
+                return
+            self._json(HTTPStatus.OK, value)
+            return
         if path == "/api/example":
             try:
                 value = {
@@ -193,10 +108,10 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         path = urlsplit(self.path).path
-        if path not in ("/api/validate", "/api/run"):
+        if path not in ("/api/validate", "/api/run", "/api/competitions"):
             self._json(HTTPStatus.NOT_FOUND, {"error": "not found"})
             return
-        if path == "/api/run":
+        if path in ("/api/run", "/api/competitions"):
             try:
                 local_client = ipaddress.ip_address(self.client_address[0]).is_loopback
             except ValueError:
@@ -235,6 +150,15 @@ class Handler(BaseHTTPRequestHandler):
                 self._json(HTTPStatus.BAD_REQUEST, {"error": "expected string solution field"})
                 return
             self._json(HTTPStatus.OK, validation_payload(data["input"], data["solution"]))
+            return
+        if path == "/api/competitions":
+            try:
+                teams = parse_teams(data, base_dir=ROOT)
+            except CompetitionConfigError as exc:
+                self._json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+                return
+            record = run_competition(data["input"], teams, results_dir=self.results_dir)
+            self._json(HTTPStatus.OK, competition_summary(record))
             return
         if not isinstance(data.get("command"), str):
             self._json(HTTPStatus.BAD_REQUEST, {"error": "expected string command field"})
