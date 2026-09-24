@@ -10,6 +10,7 @@ let currentCompetition = null;
 let selectedTeamIndex = null;
 let lifecycle = "SETUP";
 let pollTimer = null;
+const pendingUploads = new Set();
 let lastMapPick = { key: "", index: -1, time: 0 };
 
 function svg(tag, attrs = {}, label = null) {
@@ -476,12 +477,50 @@ function showLobby(summary) {
   setText("lobby-instance", `${info.patients} patients · ${info.hospitals} hospitals · ${info.ambulances} ambulances · ${info.runtime_limit_seconds}s per team`);
   const list = $("lobby-teams"); clear(list);
   summary.teams.forEach((team) => {
+    const pending = pendingUploads.has(`${summary.id}:${team.index}`);
     const row = document.createElement("div"); row.className = "lobby-team";
+    const identity = document.createElement("div"); identity.className = "lobby-team-info";
     const name = document.createElement("strong"); name.textContent = team.name;
-    const readiness = document.createElement("span"); readiness.textContent = team.ready ? "Ready · command configured" : "Not ready";
-    row.append(name, readiness); list.append(row);
+    const filename = document.createElement("small"); filename.textContent = team.filename || (team.ready ? "Developer command" : "No file uploaded");
+    identity.append(name, filename);
+    const preparation = document.createElement("div"); preparation.className = "lobby-team-info";
+    const readiness = document.createElement("span"); readiness.className = `readiness${team.preparation_status === "build_error" ? " error" : ""}`;
+    readiness.textContent = pending ? "Waiting" : (({ ready: "Ready", waiting: "Waiting", preparing: "Waiting", building: "Waiting", build_error: "Build Error" })[team.preparation_status] || "Waiting");
+    const build = document.createElement("small"); build.textContent = pending ? "Uploading…" : (({ ready: team.filename?.toLowerCase().endsWith(".cpp") ? "Build succeeded" : "Prepared", waiting: "Awaiting upload", preparing: "Preparing Python submission…", building: "Building C++ submission…", build_error: "Build failed" })[team.preparation_status] || "");
+    preparation.append(readiness, build);
+    const picker = document.createElement("input"); picker.type = "file"; picker.accept = ".py,.cpp";
+    picker.setAttribute("aria-label", `Upload submission for ${team.name}`);
+    picker.disabled = pending || ["preparing", "building"].includes(team.preparation_status);
+    picker.addEventListener("change", () => { if (picker.files[0]) uploadTeam(team.index, picker.files[0]); });
+    row.append(identity, preparation, picker);
+    if (team.build_stdout || team.build_stderr) {
+      const diagnostics = document.createElement("details"), label = document.createElement("summary"), output = document.createElement("pre");
+      label.textContent = "Build diagnostics"; output.textContent = [team.build_stdout, team.build_stderr].filter(Boolean).join("\n");
+      diagnostics.append(label, output); row.append(diagnostics);
+    }
+    list.append(row);
   });
-  $("start-live").disabled = summary.teams.some((team) => !team.ready);
+  $("start-live").disabled = summary.teams.some((team) => !team.ready) || summary.teams.some((team) => pendingUploads.has(`${summary.id}:${team.index}`));
+}
+async function uploadTeam(index, file) {
+  if (!currentCompetition || lifecycle !== "LOBBY") return;
+  const id = currentCompetition.id;
+  const key = `${id}:${index}`; pendingUploads.add(key);
+  const row = currentCompetition.teams.find((team) => team.index === index);
+  if (row) { row.ready = false; row.filename = file.name; row.preparation_status = file.name.toLowerCase().endsWith(".cpp") ? "building" : "preparing"; showLobby(currentCompetition); }
+  setText("lobby-message", `Preparing ${file.name}…`);
+  const form = new FormData(); form.append("file", file, file.name);
+  try {
+    const response = await fetch(`/api/competitions/${id}/teams/${index}/submission`, { method: "POST", body: form });
+    const result = await response.json(); if (!response.ok) throw new Error(result.error || `HTTP ${response.status}`);
+    pendingUploads.delete(key);
+    if (currentCompetition?.id !== id || lifecycle !== "LOBBY") return;
+    currentCompetition.teams[index] = result; showLobby(currentCompetition);
+    setText("lobby-message", result.ready ? `${result.name} is ready.` : `${result.name}: build failed. See diagnostics.`);
+  } catch (error) {
+    pendingUploads.delete(key);
+    if (currentCompetition?.id === id && lifecycle === "LOBBY") { setText("lobby-message", `Upload failed: ${error.message}`); await pollCompetition(id, false); }
+  }
 }
 function showLive(summary) {
   currentCompetition = summary; selectedTeamIndex = null; setStage("LIVE");
@@ -496,15 +535,17 @@ function showLive(summary) {
   const done = summary.teams.filter((team) => !["queued", "running", "validating"].includes(team.status)).length;
   setText("competition-message", active ? `${done}/${summary.teams.length} finished · ${active.name} ${active.status} · ${active.elapsed_seconds.toFixed(1)}s` : `${done}/${summary.teams.length} finished`);
 }
-async function pollCompetition(id) {
+async function pollCompetition(id, reschedule = true) {
   try {
     const response = await fetch(`/api/competitions/${id}`), summary = await response.json();
     if (!response.ok) throw new Error(summary.error || `HTTP ${response.status}`);
-    if (currentCompetition?.id !== id || lifecycle !== "LIVE") return;
+    if (currentCompetition?.id !== id || !["LOBBY", "LIVE"].includes(lifecycle)) return;
     if (summary.phase === "RESULTS") { await refreshSavedCompetitions(); await showCompetition(summary); return; }
-    showLive(summary);
+    if (summary.phase === "LOBBY") {
+      if (JSON.stringify(summary.teams) !== JSON.stringify(currentCompetition.teams)) showLobby(summary);
+    } else showLive(summary);
   } catch (error) { setText("competition-message", `Update failed: ${error.message}. Retrying…`); }
-  if (currentCompetition?.id === id && lifecycle === "LIVE") pollTimer = setTimeout(() => pollCompetition(id), 500);
+  if (reschedule && currentCompetition?.id === id && ["LOBBY", "LIVE"].includes(lifecycle)) pollTimer = setTimeout(() => pollCompetition(id), 500);
 }
 async function refreshSavedCompetitions() {
   const response = await fetch("/api/competitions"), data = await response.json();
@@ -525,7 +566,7 @@ async function startCompetition() {
     const config = JSON.parse($("competition-config").value);
     const response = await fetch("/api/competitions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...config, input: $("input-text").value }) });
     const summary = await response.json(); if (!response.ok) throw new Error(summary.error || `HTTP ${response.status}`);
-    showLobby(summary); closeDrawer();
+    showLobby(summary); closeDrawer(); pollCompetition(summary.id);
   } catch (error) { setCompetitionMessage(`Competition failed: ${error.message}`); }
   finally { button.disabled = false; button.textContent = "Create competition"; }
 }
@@ -566,6 +607,7 @@ $("validate").addEventListener("click", validateCurrent);
 $("load-example").addEventListener("click", loadExample);
 $("run-submission").addEventListener("click", runSubmission);
 $("run-competition").addEventListener("click", startCompetition);
+$("load-demo-teams").addEventListener("click", loadCompetitionExample);
 $("start-live").addEventListener("click", startLive);
 $("instance-choice").addEventListener("change", async (event) => {
   try { await loadInstance(event.target.value); } catch (error) { setText("instance-details", error.message); }
@@ -609,11 +651,11 @@ async function initialize() {
     for (const item of data.instances) $("instance-choice").append(new Option(item.name, item.id));
     $("instance-choice").value = "example"; await loadInstance("example");
   } catch (error) { setText("instance-details", `Could not load instances: ${error.message}`); }
-  await loadCompetitionExample();
+  $("competition-config").value = JSON.stringify({ teams: [{ name: "Team 1" }, { name: "Team 2" }] }, null, 2);
   try {
     await refreshSavedCompetitions();
     const response = await fetch("/api/competitions/active"), data = await response.json();
-    if (data.competition?.phase === "LOBBY") showLobby(data.competition);
+    if (data.competition?.phase === "LOBBY") { showLobby(data.competition); pollCompetition(data.competition.id); }
     if (data.competition?.phase === "LIVE") { showLive(data.competition); pollCompetition(data.competition.id); }
   }
   catch (error) { setText("competition-message", `Could not list saved results: ${error.message}`); }

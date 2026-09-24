@@ -36,40 +36,45 @@ The first single-submission runner is documented in [the runner contract](docs/R
 
 ## Competition Mode
 
-The browser follows **Setup → Lobby → Live → Results**. Setup loads three demo
-teams from [examples/competition.json](examples/competition.json). Edit the team
-JSON and click **Create competition**. Lobby shows each team's readiness; a
-configured command marks a team ready. Click **Start competition** to launch the
+The browser follows **Setup → Lobby → Live → Results**. Name teams in Setup and
+click **Create competition**. In Lobby, upload one `.py` or `.cpp` file per team.
+Python files are ready immediately; C++ files are compiled with
+`g++ -O2 -std=c++17` and become ready after a successful build. Compiler output
+is available in each team's Build diagnostics. A failed build can be replaced
+with another upload. Click **Start competition** when every team is ready to launch the
 sequential background run. Live polls every half second and displays queued,
 running, validating, and terminal statuses, the active team's elapsed time, and
 scores only after validation. The large map shows instance patient locations;
-hospital placements and outcomes appear in Results. The demo finishes with scores
-of 2 and 1 plus an invalid submission. Results ranks valid teams by score while
+hospital placements and outcomes appear in Results. Results ranks valid teams by score while
 preserving failed teams. Click a completed team for its saved diagnostics and map.
 **Saved results** reopens finished competitions without running submissions again.
 
-Edit the panel's JSON to configure your own teams:
+Edit the panel's JSON to configure your teams:
 
 ```json
 {
   "teams": [
-    {"name": "My team", "command": "python3 ./my_submission.py"},
-    {"name": "Another team", "command": "/absolute/path/to/program --fast"}
+    {"name": "My team"},
+    {"name": "Another team"}
   ]
 }
 ```
 
-Each name must be nonempty and unique. Commands use shell-style quoting to split
-arguments, but run directly without a shell. Paths beginning with `./` or `../`
-are resolved relative to the repository root; use an absolute path for programs
-elsewhere. The runner appends the same absolute input and output paths described
-in [the runner contract](docs/RUNNER.md). Each team gets the same input and the
-runner's 120-second limit.
+Each name must be nonempty and unique. Uploads are limited to 2 MB request bodies
+and safe `.py` or `.cpp` basenames. Source and compiled programs live under
+`uploads/<competition-id>/team-<index>/`, so identical filenames from different
+teams do not conflict. Replacing an upload affects only that team. The runner
+appends the same absolute input and output paths described in
+[the runner contract](docs/RUNNER.md). Each team gets the same input and the
+runner's 120-second limit. **Load command demo** fills in the older command-based
+example for local development; configured commands still mark those demo teams ready.
 
 `GET /api/instances` lists bundled instances, `GET /api/instances/<id>` loads one,
 and `POST /api/instances/preview` returns counts for input text.
 `POST /api/competitions` with `{"input": "...", "teams": [...]}` creates a lobby and
-returns immediately. `POST /api/competitions/<id>/start` starts its background
+returns immediately. `POST /api/competitions/<id>/teams/<index>/submission` accepts
+one `multipart/form-data` field named `file` and returns filename, readiness,
+preparation status, and build diagnostics. `POST /api/competitions/<id>/start` starts its background
 run and also returns immediately. `GET /api/competitions/<id>` returns a pollable
 state with each team's status, elapsed runtime, and validated score.
 `GET /api/competitions/active` resumes the latest in-memory lobby or live run
@@ -77,7 +82,7 @@ after a browser reload. `GET /api/competitions` lists saved summaries, and
 `GET /api/competitions/<id>/teams/<index>` loads a finished team's run and map.
 Completed competitions are readable JSON files in `results/<id>.json` (ignored
 by Git). Each file contains the input, team names and commands, full runner
-diagnostics and validation result, and the serialized map view. Reopening one
+diagnostics and validation result, upload/build metadata, and the serialized map view. Reopening one
 reads this file without running submissions again.
 
 ## 300-patient rehearsal
@@ -87,7 +92,8 @@ patients across coordinates 0–100, deadlines 50–450, and five hospitals with
 20 ambulances total. [Rehearsal teams](examples/rehearsal_teams.json) configure
 valid baseline and weaker solvers, plus invalid, crashing, and timeout programs
 in [one submission script](examples/rehearsal_team.py). To repeat the exercise,
-start the viewer, choose the rehearsal instance, paste the team JSON, create the
-competition, and start it from Lobby. The timeout team uses the normal
+start the viewer, choose the rehearsal instance, click **Load command demo**,
+paste the rehearsal team JSON, create the competition, and start it from Lobby.
+The timeout team uses the normal
 120-second runner limit; the entire five-team run takes about two minutes.
 Saved runs can be reopened from **Saved results** without rerunning teams.

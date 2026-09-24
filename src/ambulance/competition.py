@@ -16,6 +16,7 @@ from pathlib import Path
 from .runner import DEFAULT_TIMEOUT_SECONDS, run_submission
 from .parser import parse_input
 from .view import validation_payload
+from .submission import UPLOADS_DIR, Preparation, SubmissionError, prepare_submission, validate_filename
 
 
 RESULTS_DIR = Path(__file__).resolve().parents[2] / "results"
@@ -34,7 +35,7 @@ class Team:
 
 
 def parse_teams(config: object, *, base_dir: Path) -> list[Team]:
-    """Parse {teams: [{name, command}]} without invoking a shell.
+    """Parse named teams with optional developer command fallbacks, without a shell.
 
     Paths beginning with ./ or ../ are relative to base_dir, including script
     arguments. Bare executable names are resolved through PATH by the runner.
@@ -50,14 +51,16 @@ def parse_teams(config: object, *, base_dir: Path) -> list[Team]:
         if name in names:
             raise CompetitionConfigError(f"duplicate team name: {name}")
         command = item.get("command")
+        if command is None:
+            command = ""
         if not isinstance(command, str):
-            raise CompetitionConfigError(f"team {name} needs a command string")
+            raise CompetitionConfigError(f"team {name} command must be a string")
         try:
             argv = shlex.split(command)
         except ValueError as exc:
             raise CompetitionConfigError(f"team {name}: invalid command: {exc}") from exc
-        if not argv or any("\x00" in part for part in argv):
-            raise CompetitionConfigError(f"team {name} has an empty command or NUL character")
+        if any("\x00" in part for part in argv):
+            raise CompetitionConfigError(f"team {name} command contains a NUL character")
         argv = tuple(str((base_dir / part).resolve()) if part.startswith(("./", "../")) else part
                      for part in argv)
         names.add(name)
@@ -110,11 +113,13 @@ class CompetitionSession:
     """A local lobby and sequential background run with atomic poll snapshots."""
 
     def __init__(self, input_text: str, teams: list[Team], *, results_dir: Path = RESULTS_DIR,
+                 uploads_dir: Path = UPLOADS_DIR,
                  timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS):
         problem = parse_input(input_text)
         self.input_text = input_text
-        self.teams = teams
+        self.teams = list(teams)
         self.results_dir = results_dir
+        self.uploads_dir = uploads_dir
         self.timeout_seconds = timeout_seconds
         self.id = uuid.uuid4().hex
         self.created_at = datetime.now(timezone.utc).isoformat()
@@ -130,6 +135,11 @@ class CompetitionSession:
         self.statuses = ["queued"] * len(teams)
         self.started_at: list[float | None] = [None] * len(teams)
         self.entries: list[dict | None] = [None] * len(teams)
+        self.filenames: list[str | None] = [None] * len(teams)
+        self.preparation_statuses = ["ready" if team.argv else "waiting" for team in teams]
+        self.build_stdout = [""] * len(teams)
+        self.build_stderr = [""] * len(teams)
+        self.build_exit_codes: list[int | None] = [None] * len(teams)
         self.lock = threading.Lock()
 
     def snapshot(self) -> dict:
@@ -143,7 +153,12 @@ class CompetitionSession:
                          and run["validation"] and run["validation"]["valid"] else None)
                 elapsed = (run["elapsed_seconds"] if run else
                            now - self.started_at[index] if self.started_at[index] is not None else None)
-                rows.append({"index": index, "name": team.name, "ready": bool(team.argv),
+                rows.append({"index": index, "name": team.name, "ready": self.preparation_statuses[index] == "ready",
+                             "filename": self.filenames[index],
+                             "preparation_status": self.preparation_statuses[index],
+                             "build_stdout": self.build_stdout[index],
+                             "build_stderr": self.build_stderr[index],
+                             "build_exit_code": self.build_exit_codes[index],
                              "status": self.statuses[index], "score": score,
                              "elapsed_seconds": elapsed})
             if self.phase == "RESULTS":
@@ -153,11 +168,39 @@ class CompetitionSession:
 
     def start(self) -> bool:
         with self.lock:
-            if self.phase != "LOBBY":
+            if self.phase != "LOBBY" or any(status != "ready" for status in self.preparation_statuses):
                 return False
             self.phase = "LIVE"
             threading.Thread(target=self._run, daemon=True, name=f"competition-{self.id[:8]}").start()
         return True
+
+    def upload(self, index: int, filename: str, content: bytes) -> dict:
+        validate_filename(filename)
+        if not content:
+            raise SubmissionError("submission file is empty")
+        with self.lock:
+            if self.phase != "LOBBY" or not 0 <= index < len(self.teams):
+                raise SubmissionError("team not found in an open lobby")
+            if self.preparation_statuses[index] in ("building", "preparing"):
+                raise SubmissionError("team build is already in progress")
+            old = self.teams[index]
+            self.teams[index] = Team(old.name, "", ())
+            self.filenames[index] = filename
+            self.preparation_statuses[index] = "building" if filename.lower().endswith(".cpp") else "preparing"
+            self.build_stdout[index] = ""
+            self.build_stderr[index] = ""
+            self.build_exit_codes[index] = None
+        try:
+            prepared = prepare_submission(self.uploads_dir / self.id / f"team-{index}", filename, content)
+        except Exception as exc:
+            prepared = Preparation("build_error", (), stderr=str(exc))
+        with self.lock:
+            self.preparation_statuses[index] = prepared.status
+            self.build_stdout[index] = prepared.stdout
+            self.build_stderr[index] = prepared.stderr
+            self.build_exit_codes[index] = prepared.exit_code
+            self.teams[index] = Team(old.name, shlex.join(prepared.argv), prepared.argv)
+        return next(row for row in self.snapshot()["teams"] if row["index"] == index)
 
     def _run(self) -> None:
         for index, team in enumerate(self.teams):
@@ -178,6 +221,11 @@ class CompetitionSession:
                          "run": {"status": "runtime_error", "stdout": "", "stderr": "",
                                  "exit_code": None, "elapsed_seconds": elapsed, "error": str(exc),
                                  "solution_text": None, "validation": None}}
+            entry["submission"] = {"filename": self.filenames[index],
+                                   "preparation_status": self.preparation_statuses[index],
+                                   "build_stdout": self.build_stdout[index],
+                                   "build_stderr": self.build_stderr[index],
+                                   "build_exit_code": self.build_exit_codes[index]}
             with self.lock:
                 self.entries[index] = entry
                 self.statuses[index] = entry["run"]["status"]
@@ -200,8 +248,10 @@ class SessionManager:
         self.sessions: dict[str, CompetitionSession] = {}
 
     def create(self, input_text: str, teams: list[Team], *, results_dir: Path = RESULTS_DIR,
+               uploads_dir: Path = UPLOADS_DIR,
                timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS) -> CompetitionSession:
         session = CompetitionSession(input_text, teams, results_dir=results_dir,
+                                     uploads_dir=uploads_dir,
                                      timeout_seconds=timeout_seconds)
         with self.lock:
             self.sessions[session.id] = session

@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import argparse
+from email import policy
+from email.parser import BytesParser
 import ipaddress
 import json
 import shlex
@@ -17,6 +19,7 @@ from .competition import (CompetitionConfigError, competition_summary,
                           SessionManager)
 from .parser import ParseError, parse_input
 from .runner import run_submission
+from .submission import UPLOADS_DIR, SubmissionError
 from .view import validation_payload
 
 
@@ -29,6 +32,30 @@ ASSETS = {
     "/style.css": ("style.css", "text/css; charset=utf-8"),
     "/app.js": ("app.js", "text/javascript; charset=utf-8"),
 }
+
+
+def parse_upload(content_type: str, body: bytes) -> tuple[str, bytes]:
+    """Read exactly one browser multipart file field without trusting its path."""
+    if not content_type.lower().startswith("multipart/form-data;"):
+        raise SubmissionError("expected multipart/form-data")
+    message = BytesParser(policy=policy.default).parsebytes(
+        b"Content-Type: " + content_type.encode("latin-1") + b"\r\nMIME-Version: 1.0\r\n\r\n" + body
+    )
+    if not message.is_multipart():
+        raise SubmissionError("malformed multipart upload")
+    parts = list(message.iter_parts())
+    if len(parts) != 1 or parts[0].get_content_disposition() != "form-data" or parts[0].get_param("name", header="content-disposition") != "file":
+        raise SubmissionError("expected one file field")
+    part = parts[0]
+    filename = part.get_filename()
+    if filename is None:
+        raise SubmissionError("file field needs a filename")
+    if part.get("Content-Transfer-Encoding", "binary").lower() not in ("binary", "8bit", "7bit"):
+        raise SubmissionError("unsupported file encoding")
+    content = part.get_payload(decode=True)
+    if not isinstance(content, bytes):
+        raise SubmissionError("malformed file content")
+    return filename, content
 
 
 def run_payload(input_text: str, command: list[str]) -> dict:
@@ -47,6 +74,7 @@ def run_payload(input_text: str, command: list[str]) -> dict:
 
 class Handler(BaseHTTPRequestHandler):
     results_dir = RESULTS_DIR
+    uploads_dir = UPLOADS_DIR
     sessions = SessionManager()
 
     def _send(self, code: HTTPStatus, body: bytes, content_type: str) -> None:
@@ -141,10 +169,13 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:
         path = urlsplit(self.path).path
         is_start = path.startswith("/api/competitions/") and path.endswith("/start")
-        if path not in ("/api/validate", "/api/run", "/api/competitions", "/api/instances/preview") and not is_start:
+        parts = path.split("/")
+        is_upload = (len(parts) == 7 and parts[:3] == ["", "api", "competitions"]
+                     and parts[4] == "teams" and parts[5].isdigit() and parts[6] == "submission")
+        if path not in ("/api/validate", "/api/run", "/api/competitions", "/api/instances/preview") and not is_start and not is_upload:
             self._json(HTTPStatus.NOT_FOUND, {"error": "not found"})
             return
-        if path in ("/api/run", "/api/competitions") or is_start:
+        if path in ("/api/run", "/api/competitions") or is_start or is_upload:
             try:
                 local_client = ipaddress.ip_address(self.client_address[0]).is_loopback
             except ValueError:
@@ -167,6 +198,19 @@ class Handler(BaseHTTPRequestHandler):
         if size < 0 or size > MAX_BODY:
             self._json(HTTPStatus.REQUEST_ENTITY_TOO_LARGE, {"error": "request too large"})
             return
+        if is_upload:
+            session = self.sessions.get(parts[3])
+            if session is None:
+                self._json(HTTPStatus.NOT_FOUND, {"error": "competition not found"})
+                return
+            try:
+                filename, content = parse_upload(self.headers.get("Content-Type", ""), self.rfile.read(size))
+                row = session.upload(int(parts[5]), filename, content)
+            except SubmissionError as exc:
+                self._json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+                return
+            self._json(HTTPStatus.OK, row)
+            return
         if self.headers.get_content_type() != "application/json":
             self._json(HTTPStatus.UNSUPPORTED_MEDIA_TYPE, {"error": "expected application/json"})
             return
@@ -184,7 +228,10 @@ class Handler(BaseHTTPRequestHandler):
             if session is None:
                 self._json(HTTPStatus.NOT_FOUND, {"error": "competition not found"})
             elif not session.start():
-                self._json(HTTPStatus.CONFLICT, {"error": "competition already started"})
+                snapshot = session.snapshot()
+                error = ("all teams must be ready before starting" if snapshot["phase"] == "LOBBY"
+                         else "competition already started")
+                self._json(HTTPStatus.CONFLICT, {"error": error})
             else:
                 self._json(HTTPStatus.ACCEPTED, session.snapshot())
             return
@@ -211,7 +258,8 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/competitions":
             try:
                 teams = parse_teams(data, base_dir=ROOT)
-                session = self.sessions.create(data["input"], teams, results_dir=self.results_dir)
+                session = self.sessions.create(data["input"], teams, results_dir=self.results_dir,
+                                               uploads_dir=self.uploads_dir)
             except (CompetitionConfigError, ParseError) as exc:
                 self._json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
                 return

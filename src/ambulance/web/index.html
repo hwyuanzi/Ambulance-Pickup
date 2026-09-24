@@ -20,11 +20,11 @@
     </header>
 
     <main class="workflow-screen" id="setup-screen">
-      <div class="workflow-heading"><h1>Competition setup</h1><p>Choose an instance, configure submission commands, then create the lobby.</p></div>
+      <div class="workflow-heading"><h1>Competition setup</h1><p>Choose an instance and name the teams. Teams upload submissions in the lobby.</p></div>
       <div class="setup-layout"><div id="setup-anchor"></div><aside class="instance-card"><h2>Instance</h2><label for="instance-choice">Load a competition instance</label><select id="instance-choice"><option value="">Custom input</option></select><div id="instance-details" aria-live="polite">Add an instance to see its size.</div><p>Each team receives the same input. Runtime limit: 120 seconds per team.</p></aside></div>
     </main>
     <main class="workflow-screen" id="lobby-screen" hidden>
-      <div class="workflow-heading"><h1>Competition lobby</h1><p>Teams with configured submission commands are ready.</p></div>
+      <div class="workflow-heading"><h1>Competition lobby</h1><p>Upload one Python or C++ file for each team. C++ teams are ready after a successful build.</p></div>
       <div class="lobby-card"><div id="lobby-instance"></div><div id="lobby-teams"></div><button class="button primary" id="start-live" type="button">Start competition</button><p id="lobby-message" aria-live="polite"></p></div>
     </main>
     <main class="workspace" id="competition-workspace" hidden>
@@ -78,7 +78,7 @@
         <label for="input-text">Input text</label><textarea id="input-text" spellcheck="false" placeholder="person(xloc,yloc,rescuetime)"></textarea><details id="editor"><summary>Manual solution</summary><label for="solution-text">Solution</label><textarea id="solution-text" spellcheck="false" placeholder="H1:0,0"></textarea></details>
       </section>
       <section class="tool-section"><h3>Run a submission</h3><label for="command-text">Local command</label><input id="command-text" type="text" spellcheck="false" autocomplete="off" placeholder="python3 /absolute/path/to/submission.py"><button class="button primary" id="run-submission" type="button">Run submission</button></section>
-      <section class="tool-section"><h3>Teams</h3><label for="competition-config">Team configuration JSON</label><textarea id="competition-config" spellcheck="false"></textarea><button class="button primary" id="run-competition" type="button">Create competition</button><p id="competition-tool-message" aria-live="polite"></p><p>Saved results</p><select id="saved-competitions" aria-label="Saved competitions"><option value="">Select a competition</option></select></section>
+      <section class="tool-section"><h3>Teams</h3><label for="competition-config">Team names JSON</label><textarea id="competition-config" spellcheck="false"></textarea><div class="tool-actions"><button class="button primary" id="run-competition" type="button">Create competition</button><button class="button" id="load-demo-teams" type="button">Load command demo</button></div><p id="competition-tool-message" aria-live="polite"></p><p>Saved results</p><select id="saved-competitions" aria-label="Saved competitions"><option value="">Select a competition</option></select></section>
     </div>
     <div class="drawer-body" id="diagnostics-content" hidden>
       <section class="tool-section"><h3>Validation</h3><div id="status-value">READY</div><p id="status-foot">Load a result</p><ul id="error-list"></ul></section>
