@@ -45,6 +45,14 @@
           </div>
         </div>
         <div id="search-results" class="search-results" hidden></div>
+        <div class="replay-entry" id="replay-entry" hidden><button class="button primary" id="start-replay" type="button">Play Replay</button><span>Watch this team's validated solution over simulated time.</span></div>
+        <div class="replay-controls" id="replay-controls" hidden>
+          <div class="replay-buttons"><button id="replay-play" type="button">Play</button><button id="replay-restart" type="button">Restart</button><button id="replay-prev" type="button" aria-label="Previous event">← Event</button><button id="replay-next" type="button" aria-label="Next event">Event →</button></div>
+          <label class="replay-scrub"><span class="sr-only">Simulation time</span><input id="replay-time" type="range" min="0" max="0" step="0.01" value="0"></label>
+          <output id="replay-clock" for="replay-time">t 0 / 0</output>
+          <label class="replay-speed">Speed <select id="replay-speed"><option value="1">1x</option><option value="2">2x</option><option value="5">5x</option><option value="10">10x</option></select></label>
+          <span id="replay-event" class="replay-event" aria-live="polite">Start</span>
+        </div>
         <div class="map-stage" id="map-stage">
           <svg id="map" viewBox="0 0 620 620" role="img" aria-label="Map of hospitals and patient outcomes"></svg>
           <div class="map-empty" id="map-empty">Load a result from Setup to view the map.</div>
@@ -52,7 +60,7 @@
           <div class="map-axes" aria-hidden="true">X → &nbsp; Y ↑</div>
         </div>
         <div class="map-footer">
-          <div class="legend"><span><i class="legend-hospital"></i> Hospital</span><span><i class="legend-dot rescued"></i> Rescued <b id="rescued-count">—</b></span><span><i class="legend-dot late"></i> Late <b id="late-count">—</b></span><span><i class="legend-dot unvisited"></i> Unvisited <b id="unvisited-count">—</b></span></div>
+          <div class="legend"><span><i class="legend-hospital"></i> Hospital</span><span id="pending-legend" hidden><i class="legend-dot pending"></i> Pending <b id="pending-count">—</b></span><span><i class="legend-dot rescued"></i> Rescued <b id="rescued-count">—</b></span><span><i class="legend-dot late"></i> Late <b id="late-count">—</b></span><span><i class="legend-dot unvisited"></i> Unvisited <b id="unvisited-count">—</b></span></div>
           <span id="map-selection-hint">Select a patient or use search</span>
         </div>
       </section>

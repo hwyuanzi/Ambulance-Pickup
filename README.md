@@ -97,3 +97,24 @@ paste the rehearsal team JSON, create the competition, and start it from Lobby.
 The timeout team uses the normal
 120-second runner limit; the entire five-team run takes about two minutes.
 Saved runs can be reopened from **Saved results** without rerunning teams.
+
+## Solution replay
+
+After a competition reaches Results, select a completed team on the final
+leaderboard, then click **Play Replay** above its map. Play/Pause, Restart,
+the time scrubber, 1x/2x/5x/10x speed, and previous/next event controls are
+available. At 1x, one simulated minute passes per real second. Event buttons
+move to the next distinct simulation timestamp and focus that ambulance.
+Invalid, crashed, and timed-out teams open their diagnostics instead.
+
+The replay index contains departures, patient arrivals, loading completions,
+hospital arrivals, and delivery events. These are copied from validated engine
+route timestamps and outcomes. Patient status changes from pending to rescued
+or late only at its authoritative delivery time; the rescued counter advances
+from delivery event totals. Ambulances pause for loading and unloading, and
+move concurrently on the map between those events. All routes stay hidden
+until an ambulance, patient, or route is selected. A selected ambulance shows
+its current route. The drawn Manhattan leg moves along X first and then Y;
+this is one visual path among several possible paths with the same travel
+time, and does not change the competition simulation or score. Older saved
+completed results receive the same replay index when opened.

@@ -50,3 +50,27 @@ body:has(#competition-workspace:not([hidden])) .leaderboard-head,body:has(#compe
 @media(max-width:1150px){.topbar{height:auto;min-height:62px;flex-wrap:wrap;gap:8px;padding:10px}.lifecycle{margin-left:0}.header-summary{margin-left:auto}}
 @media(max-width:900px){.lifecycle{order:3;width:100%;margin-left:0}.setup-layout{grid-template-columns:1fr}.workflow-screen{padding:20px}.instance-card{grid-row:1}body:has(#competition-workspace:not([hidden])) .workspace{grid-template-columns:180px minmax(0,1fr) 220px}}
 @media(max-width:720px){.lifecycle{overflow:auto}.workflow-screen{padding:16px}.lobby-team{grid-template-columns:1fr;gap:8px}.lobby-team details{grid-column:1}body:has(#competition-workspace:not([hidden])) .workspace{display:flex;flex-direction:column}}
+
+/* Validated result replay. One simulation minute passes per real second at 1x. */
+.replay-entry,.replay-controls{flex:none;border-bottom:1px solid var(--line);background:#f8fbf9;padding:10px 16px;font-size:11px}
+.replay-entry{display:flex;align-items:center;gap:12px;color:var(--muted)}
+.replay-controls{display:grid;grid-template-columns:auto minmax(90px,1fr) auto auto;align-items:center;gap:8px 12px}
+.replay-buttons{display:flex;gap:5px;flex-wrap:wrap}
+.replay-buttons button{border:1px solid #b9d3c3;background:#fff;color:var(--green);border-radius:5px;padding:6px 8px;font-size:11px;font-weight:700;cursor:pointer}
+.replay-buttons button:hover{background:var(--green-soft)}
+.replay-scrub input{width:100%;accent-color:var(--green)}
+.replay-speed{white-space:nowrap;color:var(--muted)}
+.replay-speed select{padding:4px;border:1px solid var(--line);border-radius:4px;background:#fff;color:var(--ink)}
+.replay-event{grid-column:1/-1;color:#476057;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.map-patient.pending{fill:#749fbd;stroke:#fff}
+.legend-dot.pending{background:#749fbd}
+.ambulance-marker{cursor:pointer;filter:drop-shadow(0 1px 2px #173d5077)}
+.ambulance-marker circle{fill:#164b69;stroke:#fff;stroke-width:2;vector-effect:non-scaling-stroke}
+.ambulance-marker.loading circle{fill:#aa6c22}
+.ambulance-marker.unloading circle{fill:#684a95}
+.ambulance-marker.selected circle{stroke:#f6ca58;stroke-width:3}
+.ambulance-marker text{fill:#fff;font-size:8px;font-weight:800;pointer-events:none}
+@media(max-width:1150px){.replay-controls{grid-template-columns:minmax(0,1fr) auto auto}.replay-buttons{grid-column:1/-1}}
+@media(max-width:720px){.replay-entry{align-items:flex-start}.replay-controls{grid-template-columns:minmax(0,1fr) auto}.replay-speed{grid-column:2}.replay-event{grid-column:1/-1}}
+.replay-entry[hidden],.replay-controls[hidden]{display:none}
+#pending-legend[hidden]{display:none}

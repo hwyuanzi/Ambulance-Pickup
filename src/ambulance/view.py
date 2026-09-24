@@ -7,6 +7,39 @@ from .parser import ParseError, parse_input, parse_solution
 from .validator import ValidationReport, validate
 
 
+def replay_from_routes(routes: list[dict]) -> dict:
+    """Build a playback index from already validated, serialized engine routes.
+
+    This also lets older saved results gain replay without running a solver or
+    simulation again. All timestamps and outcomes are copied from engine data.
+    """
+    events = []
+    for route in routes:
+        common = {"route_id": route["id"], "ambulance_id": route["ambulance_id"]}
+        events.append({"time": route["start_time"], "kind": "departure",
+                       "hospital_id": route["start_hospital"], **common})
+        for pickup in route["pickups"]:
+            events.append({"time": pickup["arrival_time"], "kind": "patient_arrival",
+                           "patient_id": pickup["patient_id"], **common})
+            events.append({"time": pickup["loading_complete_time"], "kind": "loading_complete",
+                           "patient_id": pickup["patient_id"], **common})
+        events.append({"time": route["destination_arrival_time"], "kind": "hospital_arrival",
+                       "hospital_id": route["destination_hospital"], **common})
+        events.append({"time": route["delivery_time"], "kind": "delivery",
+                       "hospital_id": route["destination_hospital"],
+                       "outcomes": route["outcomes"], **common})
+    events.sort(key=lambda item: item["time"])
+    rescued_total = late_total = 0
+    for item in events:
+        if item["kind"] == "delivery":
+            rescued_total += sum(outcome["status"] == "rescued" for outcome in item["outcomes"])
+            late_total += sum(outcome["status"] == "late" for outcome in item["outcomes"])
+        item["rescued_total"] = rescued_total
+        item["late_total"] = late_total
+    return {"duration": max((route["delivery_time"] for route in routes), default=0),
+            "events": events}
+
+
 def validation_payload(input_text: str, solution_text: str, report: ValidationReport | None = None) -> dict:
     """Render parsed geometry and the validator's authoritative result as JSON data."""
     if report is None:
@@ -39,6 +72,7 @@ def validation_payload(input_text: str, solution_text: str, report: ValidationRe
     patient_results = {}
     if report.result is not None:
         for index, event in enumerate(report.result.routes, 1):
+            route_id = f"R{index}"
             pickups = [
                 {
                     "patient_id": f"P{pickup.patient_id}",
@@ -63,7 +97,7 @@ def validation_payload(input_text: str, solution_text: str, report: ValidationRe
                     "route_id": f"R{index}",
                 }
             routes.append({
-                "id": f"R{index}",
+                "id": route_id,
                 "source_line": event.source_line,
                 "ambulance_id": f"A{event.ambulance_id}",
                 "start_hospital": f"H{event.start_hospital}",
@@ -114,9 +148,9 @@ def validation_payload(input_text: str, solution_text: str, report: ValidationRe
         "patients": patients,
         "ambulances": ambulances,
         "routes": routes,
+        "replay": replay_from_routes(routes) if report.result is not None else None,
         "errors": [
             {"source": issue.source, "line": issue.line, "message": issue.message}
             for issue in report.issues
         ],
     }
-

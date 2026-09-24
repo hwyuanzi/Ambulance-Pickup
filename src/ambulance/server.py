@@ -20,7 +20,7 @@ from .competition import (CompetitionConfigError, competition_summary,
 from .parser import ParseError, parse_input
 from .runner import run_submission
 from .submission import UPLOADS_DIR, SubmissionError
-from .view import validation_payload
+from .view import replay_from_routes, validation_payload
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -70,6 +70,14 @@ def run_payload(input_text: str, command: list[str]) -> dict:
     view = (validation_payload(input_text, result.solution_text, result.validation)
             if result.validation is not None and result.solution_text is not None else None)
     return {"run": run, "view": view}
+
+
+def with_replay(detail: dict) -> dict:
+    """Adapt older completed result files using their saved validated route data."""
+    view = detail.get("view")
+    if (detail.get("run", {}).get("status") != "completed" or not view or not view.get("valid") or "replay" in view):
+        return detail
+    return {**detail, "view": {**view, "replay": replay_from_routes(view["routes"])}}
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -132,7 +140,7 @@ class Handler(BaseHTTPRequestHandler):
                 if value is None:
                     self._json(HTTPStatus.NOT_FOUND, {"error": "competition or team not found"})
                 else:
-                    self._json(HTTPStatus.OK, value)
+                    self._json(HTTPStatus.OK, with_replay(value) if len(parts) == 6 else value)
                 return
             try:
                 record = load_competition(parts[3], results_dir=self.results_dir)
@@ -145,7 +153,7 @@ class Handler(BaseHTTPRequestHandler):
             except (FileNotFoundError, IndexError):
                 self._json(HTTPStatus.NOT_FOUND, {"error": "competition or team not found"})
                 return
-            self._json(HTTPStatus.OK, value)
+            self._json(HTTPStatus.OK, with_replay(value) if len(parts) == 6 else value)
             return
         if path == "/api/example":
             try:

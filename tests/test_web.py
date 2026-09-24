@@ -2,6 +2,7 @@
 
 import json
 import os
+import runpy
 import shlex
 import sys
 import tempfile
@@ -14,7 +15,7 @@ from unittest.mock import patch
 
 from ambulance.parser import parse_input, parse_solution
 from ambulance.engine import simulate
-from ambulance.server import Handler, ROOT, validation_payload
+from ambulance.server import Handler, ROOT, validation_payload, with_replay
 from ambulance.runner import run_submission
 
 
@@ -44,6 +45,8 @@ class WebTests(unittest.TestCase):
             self.assertEqual([outcome["status"] for outcome in rendered["outcomes"]],
                              ["rescued" if outcome.rescued else "late" for outcome in event.outcomes])
         self.assertEqual(payload["ambulances"], [{"id": "A1", "initial_hospital": "H1"}])
+        self.assertEqual(payload["replay"]["duration"], max(route.unload_complete_time for route in engine_result.routes))
+        self.assertEqual(payload["replay"]["events"][-1]["rescued_total"], engine_result.score)
 
     def test_invalid_payload_has_errors_but_no_score_or_outcomes(self):
         input_text = "person(xloc,yloc,rescuetime)\n0,0,9\nhospital(numambulance)\n1\n"
@@ -52,6 +55,7 @@ class WebTests(unittest.TestCase):
         self.assertIsNone(payload["score"])
         self.assertIsNone(payload["counts"])
         self.assertEqual(payload["routes"], [])
+        self.assertIsNone(payload["replay"])
         self.assertEqual(payload["patients"][0]["status"], "unknown")
         self.assertEqual(payload["errors"][0]["line"], 2)
 
@@ -66,6 +70,35 @@ class WebTests(unittest.TestCase):
                          ["rescued", "late", "unvisited"])
         self.assertEqual([patient["delivery_time"] for patient in payload["patients"]],
                          [5, 5, None])
+        delivery = next(event for event in payload["replay"]["events"] if event["kind"] == "delivery")
+        self.assertEqual((delivery["time"], delivery["rescued_total"], delivery["late_total"]), (5, 1, 1))
+
+    def test_replay_simultaneous_ambulances_and_old_saved_view(self):
+        input_text = ("person(xloc,yloc,rescuetime)\n1,0,4\n0,1,3\n"
+                      "hospital(numambulance)\n2\n")
+        view = validation_payload(input_text, "H1:0,0\n0 A1 H1 P1 H1\n0 A2 H1 P2 H1\n")
+        self.assertEqual(view["replay"]["duration"], 4)
+        self.assertEqual([event["time"] for event in view["replay"]["events"][:2]], [0, 0])
+        deliveries = [event for event in view["replay"]["events"] if event["kind"] == "delivery"]
+        self.assertEqual([(event["time"], event["rescued_total"], event["late_total"]) for event in deliveries],
+                         [(4, 1, 0), (4, 1, 1)])
+        old = {"run": {"status": "completed"}, "view": {key: value for key, value in view.items() if key != "replay"}}
+        self.assertEqual(with_replay(old)["view"]["replay"], view["replay"])
+        self.assertNotIn("replay", old["view"])
+
+    def test_300_patient_replay_keeps_engine_outcomes_and_overlapping_routes(self):
+        input_text = (ROOT / "examples/rehearsal_300_input.txt").read_text(encoding="utf-8")
+        solve = runpy.run_path(str(ROOT / "examples/rehearsal_team.py"))["solve"]
+        view = validation_payload(input_text, solve(input_text, None))
+        self.assertTrue(view["valid"])
+        self.assertEqual(len(view["patients"]), 300)
+        self.assertEqual(len(view["ambulances"]), 20)
+        self.assertEqual(view["replay"]["duration"], max(route["delivery_time"] for route in view["routes"]))
+        self.assertEqual(view["replay"]["events"][-1]["rescued_total"], view["score"])
+        self.assertEqual(view["replay"]["events"][-1]["late_total"], view["counts"]["late"])
+        self.assertTrue(any(a["ambulance_id"] != b["ambulance_id"] and
+                            max(a["start_time"], b["start_time"]) < min(a["delivery_time"], b["delivery_time"])
+                            for a in view["routes"] for b in view["routes"]))
 
     def test_http_example_and_validation_api(self):
         server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
