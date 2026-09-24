@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f3f5f2">
+  <title>Ambulance Pickup · Rescue Map</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true"><span>+</span></div>
+        <div><div class="brand-name">AMBULANCE <strong>PICKUP</strong></div><div class="brand-sub">2026 · SOLUTION VIEWER</div></div>
+      </div>
+      <div class="top-actions">
+        <span class="local-tag"><span class="local-dot"></span> LOCAL SIMULATION</span>
+        <button class="button ghost" id="load-example" type="button">Load example</button>
+        <button class="button primary" id="validate" type="button"><span class="button-arrow">↗</span> Validate solution</button>
+      </div>
+    </header>
+
+    <main>
+      <div class="intro-row">
+        <div>
+          <div class="eyebrow">OPERATIONS OVERVIEW <span class="eyebrow-line"></span> 01 / 01</div>
+          <h1>Rescue map<span class="period">.</span></h1>
+          <p class="subtitle">See where each ambulance went, when patients arrived, and who made the deadline.</p>
+        </div>
+        <div class="intro-note">Routes follow simulation order <b>start time → source line</b></div>
+      </div>
+
+      <section class="overview" aria-label="Validation summary">
+        <div class="status-tile" id="status-tile">
+          <span class="tile-label">SOLUTION STATUS</span>
+          <span class="status-value" id="status-value">READY</span>
+          <span class="tile-foot" id="status-foot">Load an example or enter a plan</span>
+        </div>
+        <div class="score-tile">
+          <span class="tile-label">RESCUE SCORE</span>
+          <div class="score-value"><span id="score">—</span><span class="score-denominator" id="score-denominator"></span></div>
+          <span class="tile-foot">Patients delivered on time</span>
+        </div>
+        <div class="metric-tile"><span class="metric-dot rescued"></span><span class="tile-label">RESCUED</span><span class="metric-number" id="rescued-count">—</span></div>
+        <div class="metric-tile"><span class="metric-dot late"></span><span class="tile-label">LATE</span><span class="metric-number" id="late-count">—</span></div>
+        <div class="metric-tile"><span class="metric-dot unvisited"></span><span class="tile-label">UNVISITED</span><span class="metric-number" id="unvisited-count">—</span></div>
+        <div class="metric-tile"><span class="metric-dot routes"></span><span class="tile-label">ROUTES</span><span class="metric-number" id="route-count">—</span></div>
+      </section>
+
+      <details class="editor" id="editor">
+        <summary><span class="editor-title"><span class="editor-icon">⌘</span> Input &amp; solution</span><span class="editor-sub">Edit the text and run the validator</span><span class="editor-chevron">⌄</span></summary>
+        <div class="editor-body">
+          <label>INPUT <textarea id="input-text" spellcheck="false" placeholder="person(xloc,yloc,rescuetime)&#10;..."></textarea></label>
+          <label>SOLUTION <textarea id="solution-text" spellcheck="false" placeholder="H1:0,0&#10;0 A1 H1 P1 H1"></textarea></label>
+        </div>
+      </details>
+
+      <section class="error-card" id="error-card" hidden><div class="card-header"><div><div class="section-kicker">VALIDATION</div><h2>Issues to fix</h2></div></div><ul id="error-list"></ul></section>
+
+      <section class="workspace">
+        <div class="map-card">
+          <div class="card-header map-header">
+            <div><div class="section-kicker">SPATIAL VIEW</div><h2>Rescue map</h2></div>
+            <div class="map-header-right"><span id="map-summary">Awaiting a solution</span><span class="map-ornament" aria-hidden="true">✦</span></div>
+          </div>
+          <div class="map-stage">
+            <svg id="map" viewBox="0 0 1000 620" role="group" aria-label="Map of hospitals, patients, and ambulance routes"></svg>
+            <div class="map-empty" id="map-empty"><div class="empty-symbol">✳</div><b>No map loaded</b><span>Load the example to inspect a solution.</span></div>
+            <div class="map-coordinate">SCHEMATIC LINKS <span>·</span> MANHATTAN TRAVEL</div>
+          </div>
+          <div class="map-footer">
+            <div class="legend"><span><i class="legend-hospital"></i> Hospital</span><span><i class="legend-dot rescued"></i> Rescued</span><span><i class="legend-dot late"></i> Late</span><span><i class="legend-dot unvisited"></i> <span id="unvisited-legend-label">Unvisited</span></span></div>
+            <span class="map-hint">Select a route or patient for details</span>
+          </div>
+        </div>
+
+        <aside class="side-stack">
+          <section class="side-card routes-card">
+            <div class="card-header"><div><div class="section-kicker">DISPATCH LOG</div><h2>Routes</h2></div><span class="header-count" id="routes-label">0</span></div>
+            <div class="routes-list" id="routes-list"><div class="placeholder">Validated routes appear here.</div></div>
+          </section>
+          <section class="side-card detail-card">
+            <div class="card-header"><div><div class="section-kicker">INSPECTOR</div><h2 id="detail-heading">Route detail</h2></div><span class="detail-icon">↗</span></div>
+            <div class="detail-content" id="detail-content"><div class="placeholder">Select a route or patient on the map.</div></div>
+          </section>
+        </aside>
+      </section>
+      <footer>AMBULANCE PICKUP / 2026 <span>Timing and outcomes supplied by the Python engine</span></footer>
+    </main>
+  </div>
+</body>
+</html>

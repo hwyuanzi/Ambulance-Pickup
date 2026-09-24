@@ -16,6 +16,15 @@ def manhattan(a: Point, b: Point) -> int:
     return abs(a.x - b.x) + abs(a.y - b.y)
 
 
+def initial_ambulance_locations(problem: Problem) -> dict[int, int]:
+    """Assign stable ambulance IDs by hospital input order."""
+    locations: dict[int, int] = {}
+    for hospital in problem.hospitals:
+        for _ in range(hospital.ambulance_count):
+            locations[len(locations) + 1] = hospital.id
+    return locations
+
+
 def simulate(problem: Problem, plan: Plan) -> SimulationResult:
     """Simulate a valid plan in (start_time, source_line) order.
 
@@ -36,10 +45,10 @@ def simulate(problem: Problem, plan: Plan) -> SimulationResult:
         raise SimulationError(0, "missing placement for " + ", ".join(f"H{id}" for id in missing))
 
     # A1..An are assigned by hospital input order, then by ambulance count.
-    ambulance_state: dict[int, tuple[int, int]] = {}
-    for hospital in problem.hospitals:
-        for _ in range(hospital.ambulance_count):
-            ambulance_state[len(ambulance_state) + 1] = (hospital.id, 0)
+    ambulance_state = {
+        ambulance_id: (hospital_id, 0)
+        for ambulance_id, hospital_id in initial_ambulance_locations(problem).items()
+    }
 
     used_patients: set[int] = set()
     events: list[RouteEvent] = []
