@@ -14,7 +14,8 @@ from urllib.parse import urlsplit
 
 from .competition import (CompetitionConfigError, competition_summary,
                           list_competitions, load_competition, parse_teams, RESULTS_DIR,
-                          run_competition)
+                          SessionManager)
+from .parser import ParseError, parse_input
 from .runner import run_submission
 from .view import validation_payload
 
@@ -46,6 +47,7 @@ def run_payload(input_text: str, command: list[str]) -> dict:
 
 class Handler(BaseHTTPRequestHandler):
     results_dir = RESULTS_DIR
+    sessions = SessionManager()
 
     def _send(self, code: HTTPStatus, body: bytes, content_type: str) -> None:
         self.send_response(code)
@@ -61,6 +63,23 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_GET(self) -> None:
         path = urlsplit(self.path).path
+        if path == "/api/competitions/active":
+            active = self.sessions.active()
+            self._json(HTTPStatus.OK, {"competition": active.snapshot() if active else None})
+            return
+        if path == "/api/instances":
+            self._json(HTTPStatus.OK, {"instances": [
+                {"id": "example", "name": "Small example"},
+                {"id": "rehearsal", "name": "300-patient rehearsal"}]})
+            return
+        if path.startswith("/api/instances/"):
+            key = path.removeprefix("/api/instances/")
+            filename = {"example": "input.txt", "rehearsal": "rehearsal_300_input.txt"}.get(key)
+            if filename is None:
+                self._json(HTTPStatus.NOT_FOUND, {"error": "instance not found"})
+                return
+            self._json(HTTPStatus.OK, {"input": (ROOT / "examples" / filename).read_text(encoding="utf-8")})
+            return
         if path == "/api/competitions/example":
             try:
                 config = json.loads((ROOT / "examples/competition.json").read_text(encoding="utf-8"))
@@ -74,6 +93,19 @@ class Handler(BaseHTTPRequestHandler):
             return
         if path.startswith("/api/competitions/"):
             parts = path.split("/")
+            session = self.sessions.get(parts[3])
+            if session is not None:
+                if len(parts) == 4:
+                    value = session.snapshot()
+                elif len(parts) == 6 and parts[4] == "teams" and parts[5].isdigit():
+                    value = session.team_detail(int(parts[5]))
+                else:
+                    value = None
+                if value is None:
+                    self._json(HTTPStatus.NOT_FOUND, {"error": "competition or team not found"})
+                else:
+                    self._json(HTTPStatus.OK, value)
+                return
             try:
                 record = load_competition(parts[3], results_dir=self.results_dir)
                 if len(parts) == 4:
@@ -108,10 +140,11 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self) -> None:
         path = urlsplit(self.path).path
-        if path not in ("/api/validate", "/api/run", "/api/competitions"):
+        is_start = path.startswith("/api/competitions/") and path.endswith("/start")
+        if path not in ("/api/validate", "/api/run", "/api/competitions", "/api/instances/preview") and not is_start:
             self._json(HTTPStatus.NOT_FOUND, {"error": "not found"})
             return
-        if path in ("/api/run", "/api/competitions"):
+        if path in ("/api/run", "/api/competitions") or is_start:
             try:
                 local_client = ipaddress.ip_address(self.client_address[0]).is_loopback
             except ValueError:
@@ -142,8 +175,32 @@ class Handler(BaseHTTPRequestHandler):
         except (json.JSONDecodeError, UnicodeDecodeError):
             self._json(HTTPStatus.BAD_REQUEST, {"error": "malformed JSON"})
             return
-        if not isinstance(data, dict) or not isinstance(data.get("input"), str):
+        if not isinstance(data, dict):
+            self._json(HTTPStatus.BAD_REQUEST, {"error": "expected JSON object"})
+            return
+        if is_start:
+            parts = path.split("/")
+            session = self.sessions.get(parts[3]) if len(parts) == 5 else None
+            if session is None:
+                self._json(HTTPStatus.NOT_FOUND, {"error": "competition not found"})
+            elif not session.start():
+                self._json(HTTPStatus.CONFLICT, {"error": "competition already started"})
+            else:
+                self._json(HTTPStatus.ACCEPTED, session.snapshot())
+            return
+        if not isinstance(data.get("input"), str):
             self._json(HTTPStatus.BAD_REQUEST, {"error": "expected string input field"})
+            return
+        if path == "/api/instances/preview":
+            try:
+                problem = parse_input(data["input"])
+            except ParseError as exc:
+                self._json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
+                return
+            self._json(HTTPStatus.OK, {"patients": len(problem.patients),
+                                       "hospitals": len(problem.hospitals),
+                                       "ambulances": sum(h.ambulance_count for h in problem.hospitals),
+                                       "runtime_limit_seconds": 120})
             return
         if path == "/api/validate":
             if not isinstance(data.get("solution"), str):
@@ -154,11 +211,11 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/competitions":
             try:
                 teams = parse_teams(data, base_dir=ROOT)
-            except CompetitionConfigError as exc:
+                session = self.sessions.create(data["input"], teams, results_dir=self.results_dir)
+            except (CompetitionConfigError, ParseError) as exc:
                 self._json(HTTPStatus.BAD_REQUEST, {"error": str(exc)})
                 return
-            record = run_competition(data["input"], teams, results_dir=self.results_dir)
-            self._json(HTTPStatus.OK, competition_summary(record))
+            self._json(HTTPStatus.CREATED, session.snapshot())
             return
         if not isinstance(data.get("command"), str):
             self._json(HTTPStatus.BAD_REQUEST, {"error": "expected string command field"})

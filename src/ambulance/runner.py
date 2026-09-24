@@ -9,7 +9,7 @@ import tempfile
 import time
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Sequence
+from typing import Callable, Sequence
 
 from .validator import ValidationReport, validate
 
@@ -60,6 +60,7 @@ def _stop_process_group(process: subprocess.Popen) -> None:
 
 def run_submission(
     command: Sequence[str], input_text: str, *, timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
+    on_validating: Callable[[], None] | None = None,
 ) -> RunnerResult:
     """Run argv + [absolute input path, absolute solution path] in a fresh cwd.
 
@@ -127,6 +128,8 @@ def run_submission(
         except OSError as exc:
             return RunnerResult("invalid_solution", **common,
                                 error=f"cannot read solution.txt: {exc}")
+        if on_validating is not None:
+            on_validating()
         report = validate(input_text, solution_text)
         return RunnerResult("completed" if report.valid else "invalid_solution",
                             **common, validation=report, solution_text=solution_text)

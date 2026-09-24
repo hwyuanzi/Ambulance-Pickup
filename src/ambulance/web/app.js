@@ -8,6 +8,8 @@ let validationRun = 0;
 let submissionRun = 0;
 let currentCompetition = null;
 let selectedTeamIndex = null;
+let lifecycle = "SETUP";
+let pollTimer = null;
 let lastMapPick = { key: "", index: -1, time: 0 };
 
 function svg(tag, attrs = {}, label = null) {
@@ -20,9 +22,19 @@ function clear(node) { node.replaceChildren(); }
 function setText(id, value) { $(id).textContent = String(value); }
 function formatTime(value) { return value === null || value === undefined ? "—" : `t ${value}`; }
 function setCompetitionMessage(message) { setText("competition-message", message); setText("competition-tool-message", message); }
+function setStage(stage) {
+  lifecycle = stage;
+  if (stage === "SETUP") { setText("current-result", "Competition setup"); setText("header-score", "—"); }
+  $("setup-screen").hidden = stage !== "SETUP";
+  $("lobby-screen").hidden = stage !== "LOBBY";
+  $("competition-workspace").hidden = !["LIVE", "RESULTS"].includes(stage);
+  for (const name of ["setup", "lobby", "live", "results"])
+    $("stage-" + name).classList.toggle("active", name.toUpperCase() === stage);
+}
 function findRoute(id) { return state.data?.routes.find((route) => route.id === id); }
 function routesForAmbulance(id) { return state.data?.routes.filter((route) => route.ambulance_id === id) || []; }
 function openDrawer(tab = "setup") {
+  if (tab === "setup") { closeDrawer(); setStage("SETUP"); return; }
   $("organizer-drawer").hidden = false;
   $("drawer-backdrop").hidden = false;
   document.body.classList.add("drawer-open");
@@ -35,11 +47,9 @@ function closeDrawer() {
   document.body.classList.remove("drawer-open");
 }
 function switchDrawerTab(tab) {
-  $("setup-content").hidden = tab !== "setup";
-  $("diagnostics-content").hidden = tab !== "diagnostics";
-  $("setup-tab").classList.toggle("active", tab === "setup");
-  $("diagnostics-tab").classList.toggle("active", tab === "diagnostics");
-  setText("drawer-heading", tab === "setup" ? "Setup" : "Diagnostics");
+  if (tab === "setup") { closeDrawer(); setStage("SETUP"); return; }
+  $("diagnostics-content").hidden = false;
+  setText("drawer-heading", "Diagnostics");
 }
 function setIdle(note = "Load a result") {
   state.data = null;
@@ -282,6 +292,12 @@ function renderDetail() {
     container.append(empty); return;
   }
   if (!state.selection) {
+    if (lifecycle === "LIVE") {
+      setText("detail-heading", "Competition live");
+      const note = document.createElement("div"); note.className = "empty-panel";
+      note.textContent = "Teams run one at a time. Scores appear after validation. Select a patient on the instance map to inspect its deadline.";
+      container.append(note); return;
+    }
     const team = currentCompetition?.teams.find((item) => item.index === selectedTeamIndex);
     setText("detail-heading", team ? team.name : "Result");
     container.append(detailGrid([
@@ -371,14 +387,14 @@ function renderLeaderboard(summary) {
     if (team.score !== null) previousScore = team.score;
     const row = document.createElement("button"); row.type = "button";
     row.className = `leaderboard-row${selectedTeamIndex === team.index ? " selected" : ""}`;
-    row.disabled = team.status !== "completed";
+    row.disabled = team.status !== "completed" || lifecycle !== "RESULTS";
     row.title = team.status.replaceAll("_", " ");
-    const cells = [team.score === null ? "—" : String(rank), team.name, team.score === null ? "—" : String(team.score), ({ completed: "Done", invalid_solution: "Invalid", runtime_error: "Error", timeout: "Timeout" }[team.status] || team.status.replaceAll("_", " ")), `${team.elapsed_seconds.toFixed(2)}s`];
+    const cells = [team.score === null ? "—" : String(rank), team.name, team.score === null ? "—" : String(team.score), ({ queued: "Queued", running: "Running", validating: "Validating", completed: "Done", invalid_solution: "Invalid", runtime_error: "Error", timeout: "Timeout", missing_output: "No output" }[team.status] || team.status.replaceAll("_", " ")), team.elapsed_seconds == null ? "—" : `${team.elapsed_seconds.toFixed(1)}s`];
     for (let i = 0; i < cells.length; i++) {
       const span = document.createElement("span"); span.textContent = cells[i];
       if (i === 1) span.className = "team-name";
       if (i === 2) span.className = "team-score";
-      if (i === 3) span.className = `team-status ${team.status === "completed" ? "routine" : "alert"}`;
+      if (i === 3) span.className = `team-status ${["queued", "running", "validating", "completed"].includes(team.status) ? "routine" : "alert"}`;
       row.append(span);
     }
     row.addEventListener("click", () => openTeam(team.index)); list.append(row);
@@ -425,7 +441,7 @@ async function runSubmission() {
   finally { if (currentRun === submissionRun) { button.disabled = false; button.textContent = "Run submission"; } }
 }
 async function openTeam(index) {
-  if (!currentCompetition) return;
+  if (!currentCompetition || lifecycle !== "RESULTS") return;
   const competition = currentCompetition, currentRevision = ++revision;
   selectedTeamIndex = index; renderLeaderboard(competition);
   try {
@@ -444,11 +460,51 @@ async function openTeam(index) {
   } catch (error) { if (currentRevision === revision) setText("competition-message", `Could not load team: ${error.message}`); }
 }
 async function showCompetition(summary) {
+  stopPolling(); setStage("RESULTS");
   currentCompetition = summary; selectedTeamIndex = null; $("saved-competitions").value = summary.id;
   renderLeaderboard(summary); setText("competition-message", `Competition ${summary.created_at.slice(0, 10)}`);
   const first = summary.teams.find((team) => team.status === "completed");
   if (first) await openTeam(first.index);
   else { setIdle("No completed team results"); setText("current-result", "Competition result"); }
+}
+function stopPolling() { if (pollTimer) clearTimeout(pollTimer); pollTimer = null; }
+function showLobby(summary) {
+  currentCompetition = summary; setStage("LOBBY");
+  const info = summary.instance;
+  setText("instance-summary", `${info.patients} patients · ${info.hospitals} hospitals · ${info.ambulances} ambulances`);
+  setText("current-result", "Competition lobby"); setText("header-score", "—");
+  setText("lobby-instance", `${info.patients} patients · ${info.hospitals} hospitals · ${info.ambulances} ambulances · ${info.runtime_limit_seconds}s per team`);
+  const list = $("lobby-teams"); clear(list);
+  summary.teams.forEach((team) => {
+    const row = document.createElement("div"); row.className = "lobby-team";
+    const name = document.createElement("strong"); name.textContent = team.name;
+    const readiness = document.createElement("span"); readiness.textContent = team.ready ? "Ready · command configured" : "Not ready";
+    row.append(name, readiness); list.append(row);
+  });
+  $("start-live").disabled = summary.teams.some((team) => !team.ready);
+}
+function showLive(summary) {
+  currentCompetition = summary; selectedTeamIndex = null; setStage("LIVE");
+  renderLeaderboard(summary);
+  const map = summary.instance.map;
+  if (map) { state.data = map; state.selection = null; renderMap(); renderDetail(); renderLists(); }
+  setText("instance-summary", `${summary.instance.patients} patients · ${summary.instance.hospitals} hospitals · ${summary.instance.ambulances} ambulances`);
+  setText("current-result", "Competition live"); setText("header-score", "—");
+  setText("map-summary", "Instance patients · hospital locations appear in results");
+  setText("rescued-count", "—"); setText("late-count", "—"); setText("unvisited-count", "—");
+  const active = summary.teams.find((team) => ["running", "validating"].includes(team.status));
+  const done = summary.teams.filter((team) => !["queued", "running", "validating"].includes(team.status)).length;
+  setText("competition-message", active ? `${done}/${summary.teams.length} finished · ${active.name} ${active.status} · ${active.elapsed_seconds.toFixed(1)}s` : `${done}/${summary.teams.length} finished`);
+}
+async function pollCompetition(id) {
+  try {
+    const response = await fetch(`/api/competitions/${id}`), summary = await response.json();
+    if (!response.ok) throw new Error(summary.error || `HTTP ${response.status}`);
+    if (currentCompetition?.id !== id || lifecycle !== "LIVE") return;
+    if (summary.phase === "RESULTS") { await refreshSavedCompetitions(); await showCompetition(summary); return; }
+    showLive(summary);
+  } catch (error) { setText("competition-message", `Update failed: ${error.message}. Retrying…`); }
+  if (currentCompetition?.id === id && lifecycle === "LIVE") pollTimer = setTimeout(() => pollCompetition(id), 500);
 }
 async function refreshSavedCompetitions() {
   const response = await fetch("/api/competitions"), data = await response.json();
@@ -463,15 +519,41 @@ async function loadCompetitionExample() {
   catch (error) { setCompetitionMessage(`Could not load demo teams: ${error.message}`); }
 }
 async function startCompetition() {
-  const button = $("run-competition"); button.disabled = true; button.textContent = "Running teams…";
-  setCompetitionMessage("Running teams…");
+  const button = $("run-competition"); button.disabled = true; button.textContent = "Creating…";
+  setCompetitionMessage("Creating competition…");
   try {
     const config = JSON.parse($("competition-config").value);
     const response = await fetch("/api/competitions", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ ...config, input: $("input-text").value }) });
     const summary = await response.json(); if (!response.ok) throw new Error(summary.error || `HTTP ${response.status}`);
-    currentCompetition = summary; await refreshSavedCompetitions(); await showCompetition(summary); closeDrawer();
+    showLobby(summary); closeDrawer();
   } catch (error) { setCompetitionMessage(`Competition failed: ${error.message}`); }
-  finally { button.disabled = false; button.textContent = "Start competition"; }
+  finally { button.disabled = false; button.textContent = "Create competition"; }
+}
+async function startLive() {
+  const button = $("start-live"); button.disabled = true;
+  setText("lobby-message", "Starting…");
+  try {
+    const response = await fetch(`/api/competitions/${currentCompetition.id}/start`, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+    const summary = await response.json(); if (!response.ok) throw new Error(summary.error || `HTTP ${response.status}`);
+    showLive(summary); pollCompetition(summary.id);
+  } catch (error) { setText("lobby-message", `Could not start: ${error.message}`); button.disabled = false; }
+}
+let previewTimer = null;
+async function previewInstance() {
+  const input = $("input-text").value;
+  try {
+    const response = await fetch("/api/instances/preview", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ input }) });
+    const data = await response.json(); if (input !== $("input-text").value) return;
+    setText("instance-details", response.ok ? `${data.patients} patients · ${data.hospitals} hospitals · ${data.ambulances} ambulances · ${data.runtime_limit_seconds}s limit` : data.error);
+    if (response.ok && lifecycle === "SETUP") setText("instance-summary", `${data.patients} patients · ${data.hospitals} hospitals · ${data.ambulances} ambulances`);
+  } catch (error) { setText("instance-details", `Preview unavailable: ${error.message}`); }
+}
+async function loadInstance(id) {
+  if (!id) return;
+  const response = await fetch(`/api/instances/${id}`), data = await response.json();
+  if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
+  $("input-text").value = data.input; previewInstance();
 }
 $("open-setup").addEventListener("click", () => openDrawer("setup"));
 $("open-diagnostics").addEventListener("click", () => openDrawer("diagnostics"));
@@ -484,6 +566,10 @@ $("validate").addEventListener("click", validateCurrent);
 $("load-example").addEventListener("click", loadExample);
 $("run-submission").addEventListener("click", runSubmission);
 $("run-competition").addEventListener("click", startCompetition);
+$("start-live").addEventListener("click", startLive);
+$("instance-choice").addEventListener("change", async (event) => {
+  try { await loadInstance(event.target.value); } catch (error) { setText("instance-details", error.message); }
+});
 $("clear-selection").addEventListener("click", () => { state.selection = null; renderMap(); renderDetail(); renderLists(); });
 $("map").addEventListener("pointermove", updateHover);
 $("map").addEventListener("pointerleave", () => { $("map-tooltip").hidden = true; $("map-stage").classList.remove("point-hover"); $("map").querySelectorAll(".hovered").forEach((node) => node.classList.remove("hovered")); });
@@ -513,12 +599,23 @@ $("saved-competitions").addEventListener("change", async (event) => {
   try { const response = await fetch(`/api/competitions/${event.target.value}`), summary = await response.json(); if (!response.ok) throw new Error(summary.error || `HTTP ${response.status}`); await showCompetition(summary); closeDrawer(); }
   catch (error) { setCompetitionMessage(`Could not open competition: ${error.message}`); }
 });
-for (const id of ["input-text", "solution-text"]) $(id).addEventListener("input", () => { revision++; setIdle("Changes need validation"); clearDiagnostics(); });
+$("input-text").addEventListener("input", () => { revision++; clearTimeout(previewTimer); previewTimer = setTimeout(previewInstance, 300); $("instance-choice").value = ""; });
+$("solution-text").addEventListener("input", () => { revision++; clearDiagnostics(); });
 async function initialize() {
-  setIdle();
-  await loadExample();
+  $("setup-anchor").append($("setup-content")); $("setup-content").hidden = false;
+  setStage("SETUP"); setIdle();
+  try {
+    const response = await fetch("/api/instances"), data = await response.json();
+    for (const item of data.instances) $("instance-choice").append(new Option(item.name, item.id));
+    $("instance-choice").value = "example"; await loadInstance("example");
+  } catch (error) { setText("instance-details", `Could not load instances: ${error.message}`); }
   await loadCompetitionExample();
-  try { const saved = await refreshSavedCompetitions(); if (saved.length) await showCompetition(saved[0]); }
+  try {
+    await refreshSavedCompetitions();
+    const response = await fetch("/api/competitions/active"), data = await response.json();
+    if (data.competition?.phase === "LOBBY") showLobby(data.competition);
+    if (data.competition?.phase === "LIVE") { showLive(data.competition); pollCompetition(data.competition.id); }
+  }
   catch (error) { setText("competition-message", `Could not list saved results: ${error.message}`); }
 }
 initialize();

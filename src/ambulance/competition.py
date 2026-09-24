@@ -6,12 +6,15 @@ import json
 import os
 import re
 import shlex
+import threading
+import time
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
 from .runner import DEFAULT_TIMEOUT_SECONDS, run_submission
+from .parser import parse_input
 from .view import validation_payload
 
 
@@ -75,17 +78,24 @@ def run_competition(input_text: str, teams: list[Team], *, results_dir: Path = R
         "teams": [],
     }
     for team in teams:
-        result = run_submission(team.argv, input_text, timeout_seconds=timeout_seconds)
-        view = (validation_payload(input_text, result.solution_text, result.validation)
-                if result.validation is not None and result.solution_text is not None else None)
-        record["teams"].append({
-            "name": team.name,
-            "command": team.command,
-            "run": result.to_dict(),
-            "view": view,
-        })
+        record["teams"].append(run_team(input_text, team, timeout_seconds=timeout_seconds))
     # Normalize tuple-valued engine fields to the same shape returned by JSON reads.
     record = json.loads(json.dumps(record, ensure_ascii=False))
+    save_competition(record, results_dir=results_dir)
+    return record
+
+
+def run_team(input_text: str, team: Team, *, timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS,
+             on_validating=None) -> dict:
+    """One competition entry, using the same runner and view serialization."""
+    result = run_submission(team.argv, input_text, timeout_seconds=timeout_seconds,
+                            on_validating=on_validating)
+    view = (validation_payload(input_text, result.solution_text, result.validation)
+            if result.validation is not None and result.solution_text is not None else None)
+    return {"name": team.name, "command": team.command, "run": result.to_dict(), "view": view}
+
+
+def save_competition(record: dict, *, results_dir: Path = RESULTS_DIR) -> None:
     results_dir.mkdir(parents=True, exist_ok=True)
     path = results_dir / f"{record['id']}.json"
     temporary = results_dir / f".{record['id']}.tmp"
@@ -94,7 +104,118 @@ def run_competition(input_text: str, teams: list[Team], *, results_dir: Path = R
         os.replace(temporary, path)
     finally:
         temporary.unlink(missing_ok=True)
-    return record
+
+
+class CompetitionSession:
+    """A local lobby and sequential background run with atomic poll snapshots."""
+
+    def __init__(self, input_text: str, teams: list[Team], *, results_dir: Path = RESULTS_DIR,
+                 timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS):
+        problem = parse_input(input_text)
+        self.input_text = input_text
+        self.teams = teams
+        self.results_dir = results_dir
+        self.timeout_seconds = timeout_seconds
+        self.id = uuid.uuid4().hex
+        self.created_at = datetime.now(timezone.utc).isoformat()
+        self.instance = {"patients": len(problem.patients), "hospitals": len(problem.hospitals),
+                         "ambulances": sum(h.ambulance_count for h in problem.hospitals),
+                         "runtime_limit_seconds": timeout_seconds,
+                         "map": {"patients": [{"id": f"P{p.id}", "x": p.position.x,
+                                                 "y": p.position.y, "deadline": p.deadline,
+                                                 "status": "unknown", "delivery_time": None,
+                                                 "route_id": None} for p in problem.patients],
+                                 "hospitals": [], "ambulances": [], "routes": []}}
+        self.phase = "LOBBY"
+        self.statuses = ["queued"] * len(teams)
+        self.started_at: list[float | None] = [None] * len(teams)
+        self.entries: list[dict | None] = [None] * len(teams)
+        self.lock = threading.Lock()
+
+    def snapshot(self) -> dict:
+        with self.lock:
+            now = time.monotonic()
+            rows = []
+            for index, team in enumerate(self.teams):
+                entry = self.entries[index]
+                run = entry["run"] if entry else None
+                score = (run["validation"]["score"] if run and run["status"] == "completed"
+                         and run["validation"] and run["validation"]["valid"] else None)
+                elapsed = (run["elapsed_seconds"] if run else
+                           now - self.started_at[index] if self.started_at[index] is not None else None)
+                rows.append({"index": index, "name": team.name, "ready": bool(team.argv),
+                             "status": self.statuses[index], "score": score,
+                             "elapsed_seconds": elapsed})
+            if self.phase == "RESULTS":
+                rows.sort(key=lambda row: (row["score"] is None, -(row["score"] or 0)))
+            return {"id": self.id, "created_at": self.created_at, "phase": self.phase,
+                    "instance": self.instance, "teams": rows}
+
+    def start(self) -> bool:
+        with self.lock:
+            if self.phase != "LOBBY":
+                return False
+            self.phase = "LIVE"
+            threading.Thread(target=self._run, daemon=True, name=f"competition-{self.id[:8]}").start()
+        return True
+
+    def _run(self) -> None:
+        for index, team in enumerate(self.teams):
+            with self.lock:
+                self.statuses[index] = "running"
+                self.started_at[index] = time.monotonic()
+
+            def validating(index=index):
+                with self.lock:
+                    self.statuses[index] = "validating"
+
+            try:
+                entry = run_team(self.input_text, team, timeout_seconds=self.timeout_seconds,
+                                 on_validating=validating)
+            except Exception as exc:
+                elapsed = time.monotonic() - self.started_at[index]
+                entry = {"name": team.name, "command": team.command, "view": None,
+                         "run": {"status": "runtime_error", "stdout": "", "stderr": "",
+                                 "exit_code": None, "elapsed_seconds": elapsed, "error": str(exc),
+                                 "solution_text": None, "validation": None}}
+            with self.lock:
+                self.entries[index] = entry
+                self.statuses[index] = entry["run"]["status"]
+        record = {"format_version": 1, "id": self.id, "created_at": self.created_at,
+                  "input": self.input_text, "teams": self.entries}
+        save_competition(record, results_dir=self.results_dir)
+        with self.lock:
+            self.phase = "RESULTS"
+
+    def team_detail(self, index: int) -> dict | None:
+        with self.lock:
+            if index < 0 or index >= len(self.entries) or self.entries[index] is None:
+                return None
+            return {"input": self.input_text, **self.entries[index]}
+
+
+class SessionManager:
+    def __init__(self):
+        self.lock = threading.Lock()
+        self.sessions: dict[str, CompetitionSession] = {}
+
+    def create(self, input_text: str, teams: list[Team], *, results_dir: Path = RESULTS_DIR,
+               timeout_seconds: float = DEFAULT_TIMEOUT_SECONDS) -> CompetitionSession:
+        session = CompetitionSession(input_text, teams, results_dir=results_dir,
+                                     timeout_seconds=timeout_seconds)
+        with self.lock:
+            self.sessions[session.id] = session
+        return session
+
+    def get(self, competition_id: str) -> CompetitionSession | None:
+        with self.lock:
+            return self.sessions.get(competition_id)
+
+    def active(self) -> CompetitionSession | None:
+        with self.lock:
+            sessions = list(self.sessions.values())
+        return next((session for session in reversed(sessions)
+                     if session.snapshot()["phase"] != "RESULTS"), None)
 
 
 def load_competition(competition_id: str, *, results_dir: Path = RESULTS_DIR) -> dict:
@@ -105,6 +226,7 @@ def load_competition(competition_id: str, *, results_dir: Path = RESULTS_DIR) ->
 
 
 def competition_summary(record: dict) -> dict:
+    problem = parse_input(record["input"])
     teams = []
     for index, team in enumerate(record["teams"]):
         run = team["run"]
@@ -114,7 +236,10 @@ def competition_summary(record: dict) -> dict:
                       "score": score, "elapsed_seconds": run["elapsed_seconds"]})
     # Python's stable sort preserves configuration order when scores are equal.
     teams.sort(key=lambda team: (team["score"] is None, -(team["score"] or 0)))
-    return {"id": record["id"], "created_at": record["created_at"], "teams": teams}
+    return {"id": record["id"], "created_at": record["created_at"], "phase": "RESULTS",
+            "instance": {"patients": len(problem.patients), "hospitals": len(problem.hospitals),
+                         "ambulances": sum(h.ambulance_count for h in problem.hospitals),
+                         "runtime_limit_seconds": DEFAULT_TIMEOUT_SECONDS}, "teams": teams}
 
 
 def list_competitions(*, results_dir: Path = RESULTS_DIR) -> list[dict]:

@@ -12,18 +12,27 @@
   <div class="app-shell">
     <header class="topbar">
       <div class="brand"><span class="brand-mark" aria-hidden="true">✚</span><strong>Ambulance Pickup</strong></div>
+      <nav class="lifecycle" aria-label="Competition stage"><span id="stage-setup">Setup</span><span id="stage-lobby">Lobby</span><span id="stage-live">Live</span><span id="stage-results">Results</span></nav>
       <div class="header-summary" id="instance-summary">Loading instance…</div>
       <div class="header-result"><span id="current-result">Example result</span><strong id="header-score">—</strong></div>
-      <button class="toolbar-button" id="open-setup" type="button">Setup</button>
+      <button class="toolbar-button" id="open-setup" type="button">New competition</button>
       <button class="toolbar-button" id="open-diagnostics" type="button">Diagnostics</button>
     </header>
 
-    <main class="workspace">
+    <main class="workflow-screen" id="setup-screen">
+      <div class="workflow-heading"><h1>Competition setup</h1><p>Choose an instance, configure submission commands, then create the lobby.</p></div>
+      <div class="setup-layout"><div id="setup-anchor"></div><aside class="instance-card"><h2>Instance</h2><label for="instance-choice">Load a competition instance</label><select id="instance-choice"><option value="">Custom input</option></select><div id="instance-details" aria-live="polite">Add an instance to see its size.</div><p>Each team receives the same input. Runtime limit: 120 seconds per team.</p></aside></div>
+    </main>
+    <main class="workflow-screen" id="lobby-screen" hidden>
+      <div class="workflow-heading"><h1>Competition lobby</h1><p>Teams with configured submission commands are ready.</p></div>
+      <div class="lobby-card"><div id="lobby-instance"></div><div id="lobby-teams"></div><button class="button primary" id="start-live" type="button">Start competition</button><p id="lobby-message" aria-live="polite"></p></div>
+    </main>
+    <main class="workspace" id="competition-workspace" hidden>
       <aside class="leaderboard-panel" aria-label="Leaderboard">
         <div class="panel-heading"><h1>Leaderboard</h1><span id="team-count">0 teams</span></div>
         <div class="leaderboard-head"><span>Rank</span><span>Team</span><span>Score</span><span>Status</span><span>Runtime</span></div>
         <div id="leaderboard" class="leaderboard"><div class="empty-panel">No competition selected. Open Setup to run or load one.</div></div>
-        <div class="panel-bottom" id="competition-message" aria-live="polite">Example result loaded</div>
+        <div class="panel-bottom" id="competition-message" aria-live="polite">Set up a competition</div>
       </aside>
 
       <section class="map-panel" aria-label="Rescue map">
@@ -62,14 +71,14 @@
   <div class="drawer-backdrop" id="drawer-backdrop" hidden></div>
   <aside class="organizer-drawer" id="organizer-drawer" role="dialog" aria-modal="true" aria-labelledby="drawer-heading" hidden>
     <div class="drawer-header"><h2 id="drawer-heading">Setup</h2><button class="icon-button" id="close-drawer" type="button" aria-label="Close drawer">×</button></div>
-    <div class="drawer-tabs"><button id="setup-tab" class="active" type="button">Setup</button><button id="diagnostics-tab" type="button">Diagnostics</button></div>
+    <div class="drawer-tabs"><button id="setup-tab" type="button" hidden>Setup</button><button id="diagnostics-tab" class="active" type="button">Diagnostics</button></div>
     <div class="drawer-body" id="setup-content">
-      <section class="tool-section"><h3>Instance and solution</h3>
-        <div class="tool-actions"><button class="button" id="load-example" type="button">Load example</button><button class="button primary" id="validate" type="button">Validate solution</button></div>
-        <details id="editor" open><summary>Input and solution text</summary><label for="input-text">Input</label><textarea id="input-text" spellcheck="false" placeholder="person(xloc,yloc,rescuetime)"></textarea><label for="solution-text">Solution</label><textarea id="solution-text" spellcheck="false" placeholder="H1:0,0"></textarea></details>
+      <section class="tool-section"><h3>Instance input</h3>
+        <div class="tool-actions"><button class="button" id="load-example" type="button">Load small example</button><button class="button" id="validate" type="button">Validate solution</button></div>
+        <label for="input-text">Input text</label><textarea id="input-text" spellcheck="false" placeholder="person(xloc,yloc,rescuetime)"></textarea><details id="editor"><summary>Manual solution</summary><label for="solution-text">Solution</label><textarea id="solution-text" spellcheck="false" placeholder="H1:0,0"></textarea></details>
       </section>
       <section class="tool-section"><h3>Run a submission</h3><label for="command-text">Local command</label><input id="command-text" type="text" spellcheck="false" autocomplete="off" placeholder="python3 /absolute/path/to/submission.py"><button class="button primary" id="run-submission" type="button">Run submission</button></section>
-      <section class="tool-section"><h3>Competition</h3><label for="competition-config">Team configuration JSON</label><textarea id="competition-config" spellcheck="false"></textarea><button class="button primary" id="run-competition" type="button">Start competition</button><p id="competition-tool-message" aria-live="polite"></p><p>Saved results</p><select id="saved-competitions" aria-label="Saved competitions"><option value="">Select a competition</option></select></section>
+      <section class="tool-section"><h3>Teams</h3><label for="competition-config">Team configuration JSON</label><textarea id="competition-config" spellcheck="false"></textarea><button class="button primary" id="run-competition" type="button">Create competition</button><p id="competition-tool-message" aria-live="polite"></p><p>Saved results</p><select id="saved-competitions" aria-label="Saved competitions"><option value="">Select a competition</option></select></section>
     </div>
     <div class="drawer-body" id="diagnostics-content" hidden>
       <section class="tool-section"><h3>Validation</h3><div id="status-value">READY</div><p id="status-foot">Load a result</p><ul id="error-list"></ul></section>

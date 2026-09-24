@@ -38,3 +38,15 @@
 .map-hospital{fill:#173d50}.map-hospital.selected,.hospital-label.selected{opacity:1}
 .hospital-label{fill:#173d50;stroke:#f0f5f1}
 .team-status.routine{color:#82928e;font-weight:500}.team-status.alert{color:#a84236;font-weight:800}
+
+/* Competition workflow. The existing map inspector is the live and result workspace. */
+.lifecycle{display:flex;gap:5px;margin-left:18px}.lifecycle span{padding:6px 9px;border-radius:5px;color:var(--muted);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.04em}.lifecycle span.active{background:var(--green-soft);color:var(--green)}
+.workflow-screen{flex:1;min-height:0;overflow:auto;padding:34px max(24px,calc((100vw - 1120px)/2));background:var(--bg)}
+.workflow-heading{margin-bottom:22px}.workflow-heading h1{font-size:27px}.workflow-heading p{color:var(--muted);font-size:13px;margin-top:6px}
+.setup-layout{display:grid;grid-template-columns:minmax(0,1fr) 290px;gap:24px;align-items:start}.setup-layout #setup-content,.instance-card,.lobby-card{background:#fff;border:1px solid var(--line);border-radius:8px;padding:6px 20px 20px}.setup-layout .tool-section{padding:18px 0}.setup-layout .tool-section textarea#input-text{height:150px}.setup-layout .tool-section textarea#competition-config{height:180px}.setup-layout .tool-section label{display:block}.instance-card{padding:20px;display:grid;gap:15px;font-size:12px}.instance-card h2{font-size:17px}.instance-card label,.instance-card p{color:var(--muted)}.instance-card select{width:100%;padding:9px;border:1px solid var(--line);border-radius:5px;background:#fff}.instance-card #instance-details{padding:16px;background:var(--green-soft);color:var(--ink);line-height:1.5;border-radius:5px}
+.lobby-card{max-width:760px;padding:22px}.lobby-card #lobby-instance{padding-bottom:16px;color:var(--muted);font-size:13px;border-bottom:1px solid var(--line)}.lobby-team{display:flex;justify-content:space-between;gap:15px;padding:16px 0;border-bottom:1px solid var(--line);font-size:13px}.lobby-team span{color:var(--green);font-weight:700}.lobby-card .button{margin-top:22px}#lobby-message{margin-top:12px;color:var(--red);font-size:12px}
+body:has(#competition-workspace:not([hidden])) .workspace{grid-template-columns:minmax(245px,280px) minmax(0,1fr) minmax(245px,285px)}
+body:has(#competition-workspace:not([hidden])) .leaderboard-head,body:has(#competition-workspace:not([hidden])) .leaderboard-row{grid-template-columns:24px minmax(0,1fr) 38px 63px 42px}
+@media(max-width:1150px){.topbar{height:auto;min-height:62px;flex-wrap:wrap;gap:8px;padding:10px}.lifecycle{margin-left:0}.header-summary{margin-left:auto}}
+@media(max-width:900px){.lifecycle{order:3;width:100%;margin-left:0}.setup-layout{grid-template-columns:1fr}.workflow-screen{padding:20px}.instance-card{grid-row:1}body:has(#competition-workspace:not([hidden])) .workspace{grid-template-columns:180px minmax(0,1fr) 220px}}
+@media(max-width:720px){.lifecycle{overflow:auto}.workflow-screen{padding:16px}.lobby-team{flex-direction:column;gap:5px}body:has(#competition-workspace:not([hidden])) .workspace{display:flex;flex-direction:column}}
