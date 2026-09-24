@@ -24,3 +24,5 @@ paste another case and click **Validate solution**. The browser displays timing,
 score, and patient outcomes returned by the Python engine.
 
 See [the rules](docs/RULES.md) and [the text format](docs/FORMAT.md).
+
+The first single-submission runner is documented in [the runner contract](docs/RUNNER.md).
