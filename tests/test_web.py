@@ -1,14 +1,21 @@
 """The viewer must expose engine results without inventing outcomes."""
 
 import json
+import os
+import shlex
+import sys
+import tempfile
 import threading
 import unittest
 from http.server import ThreadingHTTPServer
+from pathlib import Path
 from urllib.request import Request, urlopen
+from unittest.mock import patch
 
 from ambulance.parser import parse_input, parse_solution
 from ambulance.engine import simulate
 from ambulance.server import Handler, ROOT, validation_payload
+from ambulance.runner import run_submission
 
 
 class WebTests(unittest.TestCase):
@@ -99,6 +106,84 @@ class WebTests(unittest.TestCase):
             server.shutdown()
             server.server_close()
             thread.join(timeout=1)
+
+
+@unittest.skipUnless(os.name == "posix", "runner requires POSIX process groups")
+class RunApiTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.scripts = Path(self.temp.name)
+        self.input_text = ("person(xloc,yloc,rescuetime)\n0,0,3\n"
+                           "hospital(numambulance)\n1\n")
+        self.server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        self.thread = threading.Thread(target=self.server.serve_forever, daemon=True)
+        self.thread.start()
+        self.addCleanup(self.thread.join, 1)
+        self.addCleanup(self.server.server_close)
+        self.addCleanup(self.server.shutdown)
+
+    def request(self, source, *, timeout_runner=False):
+        path = self.scripts / "solver.py"
+        path.write_text(source, encoding="utf-8")
+        command = shlex.join([sys.executable, str(path)])
+        request = Request(
+            f"http://127.0.0.1:{self.server.server_port}/api/run",
+            data=json.dumps({"input": self.input_text, "command": command}).encode(),
+            headers={"Content-Type": "application/json"},
+        )
+        if timeout_runner:
+            with patch("ambulance.server.run_submission", side_effect=lambda args, text:
+                       run_submission(args, text, timeout_seconds=0.15)):
+                with urlopen(request) as response:
+                    return json.load(response)
+        with urlopen(request) as response:
+            return json.load(response)
+
+    def test_success_uses_runner_validation_for_view(self):
+        with patch("ambulance.server.validate", side_effect=AssertionError("duplicate validation")):
+            payload = self.request("import pathlib,sys\n"
+                                   "pathlib.Path(sys.argv[-1]).write_text('H1:0,0\\n0 A1 H1 P1 H1\\n')\n"
+                                   "print('x' * 17000)\n")
+        self.assertEqual(payload["run"]["status"], "completed")
+        self.assertEqual(payload["run"]["exit_code"], 0)
+        self.assertEqual(len(payload["run"]["stdout"]), 16000)
+        self.assertTrue(payload["run"]["stdout_truncated"])
+        self.assertGreaterEqual(payload["run"]["elapsed_seconds"], 0)
+        self.assertTrue(payload["view"]["valid"])
+        self.assertEqual(payload["view"]["score"], 1)
+        self.assertEqual(payload["view"]["routes"][0]["delivery_time"], 2)
+
+    def test_timeout_has_no_view(self):
+        payload = self.request("import time\ntime.sleep(10)\n", timeout_runner=True)
+        self.assertEqual(payload["run"]["status"], "timeout")
+        self.assertIsNone(payload["view"])
+
+    def test_runtime_error_has_no_view_even_with_solution(self):
+        payload = self.request("import pathlib,sys\n"
+                               "pathlib.Path(sys.argv[-1]).write_text('H1:0,0\\n0 A1 H1 P1 H1\\n')\n"
+                               "print('boom', file=sys.stderr)\nsys.exit(7)\n")
+        self.assertEqual(payload["run"]["status"], "runtime_error")
+        self.assertEqual(payload["run"]["exit_code"], 7)
+        self.assertIn("boom", payload["run"]["stderr"])
+        self.assertIsNone(payload["view"])
+
+    def test_invalid_solution_has_errors_without_outcomes(self):
+        payload = self.request("import pathlib,sys\n"
+                               "pathlib.Path(sys.argv[-1]).write_text('H1:0,0\\n0 A1 H1 P0 H1\\n')\n")
+        self.assertEqual(payload["run"]["status"], "invalid_solution")
+        self.assertFalse(payload["view"]["valid"])
+        self.assertIsNone(payload["view"]["score"])
+        self.assertIsNone(payload["view"]["counts"])
+        self.assertEqual(payload["view"]["routes"], [])
+        self.assertEqual(payload["view"]["patients"][0]["status"], "unknown")
+        self.assertIn("positive ID", payload["view"]["errors"][0]["message"])
+
+    def test_missing_output_has_no_view(self):
+        payload = self.request("print('no solution')\n")
+        self.assertEqual(payload["run"]["status"], "missing_output")
+        self.assertIsNone(payload["view"])
+        self.assertIn("solution.txt", payload["run"]["error"])
 
 
 if __name__ == "__main__":

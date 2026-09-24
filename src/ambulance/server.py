@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import argparse
+import ipaddress
 import json
+import shlex
+import sys
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -11,12 +14,14 @@ from urllib.parse import urlsplit
 
 from .engine import initial_ambulance_locations
 from .parser import ParseError, parse_input, parse_solution
-from .validator import validate
+from .runner import run_submission
+from .validator import ValidationReport, validate
 
 
 ROOT = Path(__file__).resolve().parents[2]
 WEB = Path(__file__).resolve().parent / "web"
 MAX_BODY = 2 * 1024 * 1024
+MAX_DIAGNOSTIC_CHARS = 16_000
 ASSETS = {
     "/": ("index.html", "text/html; charset=utf-8"),
     "/style.css": ("style.css", "text/css; charset=utf-8"),
@@ -24,9 +29,10 @@ ASSETS = {
 }
 
 
-def validation_payload(input_text: str, solution_text: str) -> dict:
+def validation_payload(input_text: str, solution_text: str, report: ValidationReport | None = None) -> dict:
     """Render parsed geometry and the validator's authoritative result as JSON data."""
-    report = validate(input_text, solution_text)
+    if report is None:
+        report = validate(input_text, solution_text)
     try:
         problem = parse_input(input_text)
     except ParseError:
@@ -137,6 +143,20 @@ def validation_payload(input_text: str, solution_text: str) -> dict:
     }
 
 
+def run_payload(input_text: str, command: list[str]) -> dict:
+    """Adapt one runner result for the viewer without recalculating validation."""
+    result = run_submission(command, input_text)
+    run = result.to_dict()
+    run.pop("validation")
+    for stream in ("stdout", "stderr"):
+        value = run[stream]
+        run[f"{stream}_truncated"] = len(value) > MAX_DIAGNOSTIC_CHARS
+        run[stream] = value[:MAX_DIAGNOSTIC_CHARS]
+    view = (validation_payload(input_text, result.solution_text, result.validation)
+            if result.validation is not None and result.solution_text is not None else None)
+    return {"run": run, "view": view}
+
+
 class Handler(BaseHTTPRequestHandler):
     def _send(self, code: HTTPStatus, body: bytes, content_type: str) -> None:
         self.send_response(code)
@@ -157,6 +177,7 @@ class Handler(BaseHTTPRequestHandler):
                 value = {
                     "input": (ROOT / "examples/input.txt").read_text(encoding="utf-8"),
                     "solution": (ROOT / "examples/solution.txt").read_text(encoding="utf-8"),
+                    "command": shlex.join([sys.executable, str(ROOT / "examples/submission.py")]),
                 }
             except OSError:
                 self._json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": "example files unavailable"})
@@ -171,9 +192,25 @@ class Handler(BaseHTTPRequestHandler):
         self._send(HTTPStatus.OK, (WEB / name).read_bytes(), content_type)
 
     def do_POST(self) -> None:
-        if urlsplit(self.path).path != "/api/validate":
+        path = urlsplit(self.path).path
+        if path not in ("/api/validate", "/api/run"):
             self._json(HTTPStatus.NOT_FOUND, {"error": "not found"})
             return
+        if path == "/api/run":
+            try:
+                local_client = ipaddress.ip_address(self.client_address[0]).is_loopback
+            except ValueError:
+                local_client = False
+            origin = self.headers.get("Origin")
+            try:
+                host = urlsplit("//" + self.headers.get("Host", "")).hostname
+            except ValueError:
+                host = None
+            local_host = host in ("127.0.0.1", "localhost", "::1")
+            same_origin = origin is None or urlsplit(origin).netloc == self.headers.get("Host")
+            if not (local_client and local_host and same_origin):
+                self._json(HTTPStatus.FORBIDDEN, {"error": "submissions can only run from a local client"})
+                return
         try:
             size = int(self.headers.get("Content-Length", ""))
         except ValueError:
@@ -190,10 +227,30 @@ class Handler(BaseHTTPRequestHandler):
         except (json.JSONDecodeError, UnicodeDecodeError):
             self._json(HTTPStatus.BAD_REQUEST, {"error": "malformed JSON"})
             return
-        if not isinstance(data, dict) or not isinstance(data.get("input"), str) or not isinstance(data.get("solution"), str):
-            self._json(HTTPStatus.BAD_REQUEST, {"error": "expected string input and solution fields"})
+        if not isinstance(data, dict) or not isinstance(data.get("input"), str):
+            self._json(HTTPStatus.BAD_REQUEST, {"error": "expected string input field"})
             return
-        self._json(HTTPStatus.OK, validation_payload(data["input"], data["solution"]))
+        if path == "/api/validate":
+            if not isinstance(data.get("solution"), str):
+                self._json(HTTPStatus.BAD_REQUEST, {"error": "expected string solution field"})
+                return
+            self._json(HTTPStatus.OK, validation_payload(data["input"], data["solution"]))
+            return
+        if not isinstance(data.get("command"), str):
+            self._json(HTTPStatus.BAD_REQUEST, {"error": "expected string command field"})
+            return
+        try:
+            command = shlex.split(data["command"])
+        except ValueError as exc:
+            self._json(HTTPStatus.BAD_REQUEST, {"error": f"invalid command: {exc}"})
+            return
+        if not command:
+            self._json(HTTPStatus.BAD_REQUEST, {"error": "command must not be empty"})
+            return
+        if any("\x00" in part for part in command):
+            self._json(HTTPStatus.BAD_REQUEST, {"error": "command contains a NUL character"})
+            return
+        self._json(HTTPStatus.OK, run_payload(data["input"], command))
 
 
 def main(argv: list[str] | None = None) -> None:

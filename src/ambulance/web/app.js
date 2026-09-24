@@ -5,6 +5,7 @@ const SVG_NS = "http://www.w3.org/2000/svg";
 const state = { data: null, selectedRoute: null, selectedPatient: null };
 let revision = 0;
 let validationRun = 0;
+let submissionRun = 0;
 
 function svg(tag, attrs = {}, text = null) {
   const node = document.createElementNS(SVG_NS, tag);
@@ -49,6 +50,25 @@ function setIdle(note = "Load an example or enter a plan") {
   $("map-empty").hidden = false;
   $("error-card").hidden = true;
   clear($("map"));
+}
+
+function clearDiagnostics() {
+  $("diagnostics-card").hidden = true;
+}
+
+function renderDiagnostics(run) {
+  const card = $("diagnostics-card");
+  card.hidden = false;
+  card.classList.toggle("failed", run.status !== "completed");
+  setText("run-status", run.status);
+  setText("run-elapsed", `${run.elapsed_seconds.toFixed(3)} s`);
+  setText("run-exit", run.exit_code === null ? "—" : run.exit_code);
+  setText("run-stdout", run.stdout || "(empty)");
+  setText("run-stderr", run.stderr || "(empty)");
+  $("stdout-truncated").hidden = !run.stdout_truncated;
+  $("stderr-truncated").hidden = !run.stderr_truncated;
+  $("run-error").hidden = !run.error;
+  setText("run-error", run.error || "");
 }
 
 function renderSummary() {
@@ -260,6 +280,7 @@ async function validateCurrent() {
   const button = $("validate");
   const currentRevision = ++revision;
   const currentRun = ++validationRun;
+  clearDiagnostics();
   button.disabled = true;
   button.textContent = "Validating…";
   try {
@@ -292,6 +313,7 @@ async function validateCurrent() {
 async function loadExample() {
   const currentRevision = ++revision;
   setIdle("Loading example…");
+  clearDiagnostics();
   try {
     const response = await fetch("/api/example");
     const data = await response.json();
@@ -299,6 +321,7 @@ async function loadExample() {
     if (currentRevision !== revision) return;
     $("input-text").value = data.input;
     $("solution-text").value = data.solution;
+    $("command-text").value = data.command;
     $("editor").open = false;
     await validateCurrent();
   } catch (error) {
@@ -306,11 +329,55 @@ async function loadExample() {
   }
 }
 
+async function runSubmission() {
+  const button = $("run-submission");
+  const currentRevision = ++revision;
+  const currentRun = ++submissionRun;
+  button.disabled = true;
+  button.textContent = "Running…";
+  clearDiagnostics();
+  setIdle("Submission running…");
+  try {
+    const response = await fetch("/api/run", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ input: $("input-text").value, command: $("command-text").value }),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
+    if (currentRevision !== revision) return;
+    renderDiagnostics(data.run);
+    if (data.run.solution_text !== null) $("solution-text").value = data.run.solution_text;
+    if (data.view) {
+      state.data = data.view;
+      state.selectedRoute = data.view.routes[0]?.id || null;
+      state.selectedPatient = null;
+      render();
+    } else {
+      setText("status-value", data.run.status.toUpperCase());
+      setText("status-foot", data.run.error || "No validated solution is available");
+      $("status-tile").classList.add("invalid");
+    }
+  } catch (error) {
+    if (currentRevision === revision) {
+      setIdle(`Run request failed: ${error.message}`);
+      $("status-tile").classList.add("invalid");
+      setText("status-value", "ERROR");
+    }
+  } finally {
+    if (currentRun === submissionRun) {
+      button.disabled = false;
+      button.textContent = "Run submission";
+    }
+  }
+}
+
 $("validate").addEventListener("click", validateCurrent);
 $("load-example").addEventListener("click", loadExample);
+$("run-submission").addEventListener("click", runSubmission);
 for (const id of ["input-text", "solution-text"]) $(id).addEventListener("input", () => {
   revision++;
   setIdle("Changes need validation");
+  clearDiagnostics();
 });
 setIdle();
 loadExample();

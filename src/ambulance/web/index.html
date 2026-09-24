@@ -57,6 +57,19 @@
         </div>
       </details>
 
+      <section class="runner-card" aria-label="Run a local submission">
+        <div class="runner-heading"><div><div class="section-kicker">ORGANIZER TOOL</div><h2>Run a submission</h2><p>The command runs locally with the input and output paths appended.</p></div></div>
+        <div class="runner-controls"><label for="command-text">LOCAL COMMAND</label><input id="command-text" type="text" spellcheck="false" autocomplete="off" placeholder="python3 /absolute/path/to/submission.py"><button class="button primary" id="run-submission" type="button">Run submission</button></div>
+        <div class="runner-hint">Use the current input above. The example command copies the bundled example solution; enter your own program to test another case.</div>
+      </section>
+
+      <section class="diagnostics-card" id="diagnostics-card" aria-live="polite" hidden>
+        <div class="diagnostics-head"><div><div class="section-kicker">EXECUTION</div><h2>Run diagnostics</h2></div><strong id="run-status">—</strong></div>
+        <div class="diagnostics-meta"><span>Elapsed <b id="run-elapsed">—</b></span><span>Exit code <b id="run-exit">—</b></span></div>
+        <p id="run-error" hidden></p>
+        <div class="diagnostics-streams"><div><h3>STDOUT <span id="stdout-truncated" hidden>· truncated</span></h3><pre id="run-stdout"></pre></div><div><h3>STDERR <span id="stderr-truncated" hidden>· truncated</span></h3><pre id="run-stderr"></pre></div></div>
+      </section>
+
       <section class="error-card" id="error-card" hidden><div class="card-header"><div><div class="section-kicker">VALIDATION</div><h2>Issues to fix</h2></div></div><ul id="error-list"></ul></section>
 
       <section class="workspace">

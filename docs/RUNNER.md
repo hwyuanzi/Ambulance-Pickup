@@ -33,8 +33,10 @@ not calculate timing or score.
 validation report when a UTF-8 solution was produced; `solution_text` holds that
 text. `to_dict()` provides JSON-compatible process fields and the validator's
 score, errors, and engine route events. Missing or invalid output never gets a
-fabricated score. The result can be passed to a future API adapter; this MVP does
-not expose a runner HTTP endpoint.
+fabricated score. The local viewer exposes `POST /api/run` with JSON input and
+command strings. Its response contains `run` (runner status and bounded
+diagnostics) and `view` (the existing validation/map payload when a UTF-8
+solution was produced).
 
 Process-group cleanup requires a POSIX host. This MVP does not sandbox untrusted
 code, set memory or output limits, build submissions, or contain child processes
