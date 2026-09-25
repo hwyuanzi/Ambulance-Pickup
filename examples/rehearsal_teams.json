@@ -1,9 +1,0 @@
-{
-  "teams": [
-    {"name": "Baseline", "command": "python3 ./examples/rehearsal_team.py baseline"},
-    {"name": "Weaker", "command": "python3 ./examples/rehearsal_team.py weaker"},
-    {"name": "Invalid", "command": "python3 ./examples/rehearsal_team.py invalid"},
-    {"name": "Crashing", "command": "python3 ./examples/rehearsal_team.py crash"},
-    {"name": "Timeout", "command": "python3 ./examples/rehearsal_team.py timeout"}
-  ]
-}

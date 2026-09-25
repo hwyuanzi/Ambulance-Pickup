@@ -1,0 +1,138 @@
+Using input_data.txt as input.
+
+Reading data: Outputs/sample_team.txt
+
+H1:10,10
+ Hospital #1: coordinates (10,10)
+
+H2:20,20
+ Hospital #2: coordinates (20,20)
+
+H3:30,30
+ Hospital #3: coordinates (30,30)
+
+H4:40,40
+ Hospital #4: coordinates (40,40)
+
+H5:50,50
+ Hospital #5: coordinates (50,50)
+
+0 H2 P1 H2
+ Nobody will make it by end of 632 minutes.
+
+0 H3 P2 H3
+ Nobody will make it by end of 182 minutes.
+
+0 H4 P3 H4
+ Nobody will make it by end of 246 minutes.
+
+0 H5 P4 H5
+ Nobody will make it by end of 412 minutes.
+
+0 H1 P5 H1
+ Nobody will make it by end of 792 minutes.
+
+0 H2 P6 H2
+ Nobody will make it by end of 306 minutes.
+
+0 H3 P7 H3
+ Nobody will make it by end of 350 minutes.
+
+0 H4 P8 H4
+ Nobody will make it by end of 524 minutes.
+
+0 H5 P9 H5
+ Rescued: P9:(59,20,84) at 80 minutes | Ended at Hospital H4:(50,50)
+
+0 H1 P10 H1
+ Nobody will make it by end of 642 minutes.
+
+0 H2 P11 H2
+ Nobody will make it by end of 388 minutes.
+
+0 H3 P12 H3
+ Nobody will make it by end of 732 minutes.
+
+0 H4 P13 H4
+ Rescued: P13:(57,20,154) at 76 minutes | Ended at Hospital H3:(40,40)
+
+0 H5 P14 H5
+ Nobody will make it by end of 482 minutes.
+
+0 H1 P15 H1
+ Nobody will make it by end of 424 minutes.
+
+0 H2 P16 H2
+ Nobody will make it by end of 238 minutes.
+
+0 H3 P17 H3
+ Nobody will make it by end of 130 minutes.
+
+0 H4 P18 H4
+ Nobody will make it by end of 290 minutes.
+
+0 H5 P19 H5
+ Nobody will make it by end of 206 minutes.
+
+0 H1 P20 H1
+ Nobody will make it by end of 374 minutes.
+
+0 H2 P21 H2
+ Nobody will make it by end of 280 minutes.
+
+0 H3 P22 H3
+ Nobody will make it by end of 194 minutes.
+
+0 H4 P23 H4
+ Nobody will make it by end of 672 minutes.
+
+0 H5 P24 H5
+ Nobody will make it by end of 534 minutes.
+
+0 H1 P25 H1
+ Nobody will make it by end of 684 minutes.
+
+0 H2 P26 H2
+ Nobody will make it by end of 118 minutes.
+
+0 H3 P27 H3
+ Rescued: P27:(23,18,168) at 40 minutes | Ended at Hospital H2:(30,30)
+
+0 H4 P28 H4
+ Nobody will make it by end of 406 minutes.
+
+0 H5 P29 H5
+ Nobody will make it by end of 116 minutes.
+
+0 H1 P30 H1
+ !!! No ambulance left at hospital H0:(10,10) at the start time 0 minutes.
+
+0 H2 P31 H2
+ Nobody will make it by end of 222 minutes.
+
+0 H3 P32 H3
+ Nobody will make it by end of 424 minutes.
+
+0 H4 P33 H4
+ Rescued: P33:(46,7,142) at 80 minutes | Ended at Hospital H3:(40,40)
+
+0 H5 P34 H5
+ !!! No ambulance left at hospital H4:(50,50) at the start time 0 minutes.
+
+0 H1 P35 H1
+ !!! No ambulance left at hospital H0:(10,10) at the start time 0 minutes.
+
+0 H2 P36 H2
+ Nobody will make it by end of 354 minutes.
+
+0 H3 P37 H3
+ !!! No ambulance left at hospital H2:(30,30) at the start time 0 minutes.
+
+0 H4 P38 H4
+ !!! No ambulance left at hospital H3:(40,40) at the start time 0 minutes.
+
+0 H5 P39 H5
+ !!! No ambulance left at hospital H4:(50,50) at the start time 0 minutes.
+
+Total score: 4 
+

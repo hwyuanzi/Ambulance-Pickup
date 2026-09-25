@@ -1,0 +1,216 @@
+Using input_data.txt as input.
+
+Reading data: Outputs/team_name.txt
+
+H1:67,143
+ Hospital #1: coordinates (67,143)
+
+H2:103,49
+ Hospital #2: coordinates (103,49)
+
+H3:42,62
+ Hospital #3: coordinates (42,62)
+
+H4:69,295
+ Hospital #4: coordinates (69,295)
+
+H5:42,214
+ Hospital #5: coordinates (42,214)
+
+0 H2 P124 P284 P273 P256 H2
+ Rescued: P124:(83,26,156) and P284:(71,26,164) and P273:(71,13,154) and P256:(75,22,153) at 141 minutes | Ended at Hospital H1:(103,49)
+
+0 H4 P285 P167 P117 P154 H4
+ Rescued: P285:(91,283,153) and P167:(91,282,111) and P117:(93,282,124) and P154:(98,282,109) at 89 minutes | Ended at Hospital H3:(69,295)
+
+0 H4 P58 P202 H4
+ Rescued: P58:(85,309,156) and P202:(85,301,156) at 63 minutes | Ended at Hospital H3:(69,295)
+
+0 H5 P69 P221 P4 P116 H5
+ Rescued: P69:(33,228,82) and P221:(31,233,104) and P4:(28,233,89) and P116:(28,215,87) at 71 minutes | Ended at Hospital H4:(42,214)
+
+0 H5 P98 H5
+ Rescued: P98:(41,208,88) at 16 minutes | Ended at Hospital H4:(42,214)
+
+0 H5 P206 H5
+ Rescued: P206:(37,220,115) at 24 minutes | Ended at Hospital H4:(42,214)
+
+0 H1 P137 P56 P11 P184 H5
+ Rescued: P137:(41,168,161) and P11:(37,196,149) and P184:(37,196,137) at 111 minutes | Ended at Hospital H4:(42,214) | Rest could not make it in time.
+
+0 H5 P261 H5
+ Rescued: P261:(55,225,166) at 50 minutes | Ended at Hospital H4:(42,214)
+
+0 H3 P60 P38 P70 P89 H3
+ Rescued: P60:(37,78,80) and P38:(39,84,99) and P70:(41,84,74) and P89:(42,80,82) at 59 minutes | Ended at Hospital H2:(42,62)
+
+0 H3 P177 H3
+ Rescued: P177:(37,23,149) at 90 minutes | Ended at Hospital H2:(42,62)
+
+0 H1 P132 P233 P257 P35 H1
+ Rescued: P132:(98,149,162) and P233:(100,147,150) and P257:(100,133,169) and P35:(94,135,161) at 103 minutes | Ended at Hospital H0:(67,143)
+
+0 H3 P238 P296 P282 P30 H3
+ Rescued: P238:(41,87,124) and P296:(39,98,139) and P282:(44,92,91) and P30:(45,90,127) at 89 minutes | Ended at Hospital H2:(42,62)
+
+0 H3 P102 H3
+ Rescued: P102:(59,46,157) at 68 minutes | Ended at Hospital H2:(42,62)
+
+0 H3 P85 P207 P232 P201 H3
+ Rescued: P85:(52,83,86) and P207:(54,83,147) and P232:(55,84,103) and P201:(52,85,124) at 77 minutes | Ended at Hospital H2:(42,62)
+
+0 H3 P278 P268 P50 P242 H3
+ Rescued: P278:(48,82,153) and P268:(49,82,152) and P50:(45,86,154) and P242:(39,85,163) at 73 minutes | Ended at Hospital H2:(42,62)
+
+0 H1 P290 P271 P200 P288 H1
+ Rescued: P290:(78,137,92) and P271:(80,133,151) and P200:(92,134,77) and P288:(89,137,113) at 75 minutes | Ended at Hospital H0:(67,143)
+
+0 H1 P240 P156 H1
+ Rescued: P240:(85,152,165) and P156:(81,150,138) at 57 minutes | Ended at Hospital H0:(67,143)
+
+0 H1 P123 P20 P131 P3 H1
+ Rescued: P123:(46,152,119) and P20:(46,160,103) and P131:(38,161,107) and P3:(45,157,117) at 99 minutes | Ended at Hospital H0:(67,143)
+
+0 H3 P157 P259 P266 P72 H3
+ Rescued: P157:(21,87,107) and P259:(22,90,116) and P266:(28,91,162) and P72:(33,88,135) at 105 minutes | Ended at Hospital H2:(42,62)
+
+0 H3 P77 P40 P265 P258 H3
+ !!! No ambulance left at hospital H2:(42,62) at the start time 0 minutes.
+
+0 H3 P53 P170 H3
+ !!! No ambulance left at hospital H2:(42,62) at the start time 0 minutes.
+
+0 H3 P145 P299 P59 P135 H3
+ !!! No ambulance left at hospital H2:(42,62) at the start time 0 minutes.
+
+0 H2 P99 P181 P22 P64 H2
+ Rescued: P99:(114,22,130) and P181:(117,11,132) and P22:(122,34,140) and P64:(121,46,157) at 119 minutes | Ended at Hospital H1:(103,49)
+
+0 H5 P174 P213 P176 P245 H4
+ Rescued: P174:(37,283,135) and P213:(41,291,155) and P176:(48,290,150) and P245:(53,290,145) at 125 minutes | Ended at Hospital H3:(69,295)
+
+0 H2 P31 P220 P119 P118 H3
+ Rescued: P31:(69,81,161) and P220:(71,83,169) and P119:(66,90,157) and P118:(59,86,164) at 139 minutes | Ended at Hospital H2:(42,62)
+
+0 H2 P199 P141 P263 P241 H2
+ Rescued: P199:(123,54,99) and P141:(126,52,169) and P263:(125,38,116) and P241:(124,41,151) at 83 minutes | Ended at Hospital H1:(103,49)
+
+0 H2 P219 P224 H2
+ Rescued: P219:(118,53,138) and P224:(120,54,136) at 47 minutes | Ended at Hospital H1:(103,49)
+
+0 H5 P76 P68 P294 P183 H5
+ Rescued: P76:(47,201,135) and P68:(43,200,107) and P294:(33,197,126) and P183:(41,205,97) at 67 minutes | Ended at Hospital H4:(42,214)
+
+0 H5 P62 P175 P28 P248 H5
+ !!! No ambulance left at hospital H4:(42,214) at the start time 0 minutes.
+
+0 H5 P222 P138 P63 P105 H5
+ !!! No ambulance left at hospital H4:(42,214) at the start time 0 minutes.
+
+0 H5 P32 P215 P82 P239 H5
+ !!! No ambulance left at hospital H4:(42,214) at the start time 0 minutes.
+
+0 H5 P83 P216 P218 P164 H5
+ !!! No ambulance left at hospital H4:(42,214) at the start time 0 minutes.
+
+15 H5 P255 P197 P127 H5
+ !!! No ambulance left at hospital H4:(42,214) at the start time 15 minutes.
+
+16 H5 P7 P66 P251 P209 H5
+ Rescued: P7:(29,203,103) and P66:(21,201,136) and P251:(21,208,95) at 91 minutes | Ended at Hospital H4:(42,214) | Rest could not make it in time.
+
+25 H5 P230 H5
+ Rescued: P230:(32,214,99) at 47 minutes | Ended at Hospital H4:(42,214)
+
+50 H5 P264 P48 H5
+ Rescued: P264:(31,212,142) and P48:(29,208,141) at 91 minutes | Ended at Hospital H4:(42,214)
+
+59 H1 P95 P198 P295 H1
+ Rescued: P295:(61,167,152) at 129 minutes | Ended at Hospital H0:(67,143) | Rest could not make it in time.
+
+59 H3 P267 P140 P190 P205 H3
+ Rescued: P205:(44,50,136) at 134 minutes | Ended at Hospital H2:(42,62) | Rest could not make it in time.
+
+61 H4 P122 P166 P195 P24 H4
+ Nobody will make it by end of 158 minutes.
+
+62 H4 P115 P229 H4
+ Rescued: P115:(74,291,121) and P229:(71,291,163) at 83 minutes | Ended at Hospital H3:(69,295)
+
+68 H3 P80 H3
+ Rescued: P80:(44,86,130) at 122 minutes | Ended at Hospital H2:(42,62)
+
+68 H4 P54 H4
+ Rescued: P54:(68,286,144) at 90 minutes | Ended at Hospital H3:(69,295)
+
+69 H1 P249 P120 P286 P18 H1
+ !!! No ambulance left at hospital H0:(67,143) at the start time 69 minutes.
+
+69 H4 P142 P111 P103 P160 H4
+ Rescued: P111:(45,299,155) at 150 minutes | Ended at Hospital H3:(69,295) | Rest could not make it in time.
+
+74 H4 P297 H4
+ Rescued: P297:(71,318,135) at 126 minutes | Ended at Hospital H3:(69,295)
+
+75 H4 P275 P163 P37 P147 H4
+ Rescued: P37:(53,284,154) at 140 minutes | Ended at Hospital H3:(69,295) | Rest could not make it in time.
+
+79 H4 P287 P246 P1 P252 H4
+ !!! No ambulance left at hospital H3:(69,295) at the start time 79 minutes.
+
+81 H4 P121 P161 H4
+ !!! No ambulance left at hospital H3:(69,295) at the start time 81 minutes.
+
+86 H4 P125 P223 P114 P129 H5
+ Nobody will make it by end of 215 minutes.
+
+91 H4 P81 P73 P192 P101 H4
+ Nobody will make it by end of 164 minutes.
+
+95 H4 P65 P231 H4
+ Nobody will make it by end of 160 minutes.
+
+97 H4 P43 P185 P247 P25 H4
+ !!! No ambulance left at hospital H3:(69,295) at the start time 97 minutes.
+
+100 H4 P283 P104 P300 H4
+ !!! No ambulance left at hospital H3:(69,295) at the start time 100 minutes.
+
+101 H4 P193 P10 P289 H4
+ !!! No ambulance left at hospital H3:(69,295) at the start time 101 minutes.
+
+104 H2 P227 P79 P42 P39 H2
+ Nobody will make it by end of 187 minutes.
+
+104 H2 P293 P17 P173 P149 H2
+ Nobody will make it by end of 165 minutes.
+
+105 H2 P74 P16 H2
+ Nobody will make it by end of 196 minutes.
+
+111 H2 P179 P144 P262 P134 H2
+ Nobody will make it by end of 170 minutes.
+
+117 H2 P143 P130 H2
+ Nobody will make it by end of 202 minutes.
+
+121 H2 P155 P136 P2 H2
+ Nobody will make it by end of 151 minutes.
+
+127 H2 P243 P292 P150 P217 H2
+ Nobody will make it by end of 174 minutes.
+
+132 H2 P276 P49 P235 H2
+ Nobody will make it by end of 170 minutes.
+
+148 H2 P226 P109 P196 P212 H2
+ Nobody will make it by end of 265 minutes.
+
+173 H2 P182 P112 P165 P51 H2
+ Rescued: P182:(99,44,400) at 268 minutes | Ended at Hospital H1:(103,49) | Rest could not make it in time.
+
+181 H2 P171 P78 P113 P225 H2
+ Nobody will make it by end of 278 minutes.
+
+Total score: 94 
+
