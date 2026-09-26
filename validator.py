@@ -29,7 +29,7 @@ def read_hospital(line, persons, hospitals, placed_hospitals):
     hospitals[hospital_no - 1].y = y
     
 # read_results
-def readresults(persons, hospitals, fname):
+def readresults(persons, hospitals, fname, trace=None):
     print('Reading data:', fname)
     res = {}
     score = 0
@@ -98,7 +98,7 @@ def readresults(persons, hospitals, fname):
                 continue
             if not hos or not end_hos:
                 raise FormatSyntaxError('Either start hospital or end hospital is not defined.')
-            rescue_persons = hos.rescue(rescue_persons, end_hos, start_time)
+            rescue_persons = hos.rescue(rescue_persons, end_hos, start_time, trace=trace)
             if hos.hid in res:
                 res[hos.hid].extend(rescue_persons)
             else:

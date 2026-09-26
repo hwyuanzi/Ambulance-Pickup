@@ -4,7 +4,9 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
+from unittest import mock
 
 from competition import run_participant
 from utils import read_data
@@ -57,6 +59,42 @@ class CompetitionTests(unittest.TestCase):
         result = run_participant("Slow", slow, self.instance, self.path / "r", 0.1, 5)
         self.assertEqual(result["status"], "Timeout")
         self.assertIsNone(result["score"])
+
+    def test_compilation_uses_part_of_the_total_time_budget(self):
+        source = self.source("budget", "solver.c", "int main(void) { return 0; }\n")
+        limits = {}
+
+        def compile_source(_command, _cwd, _input, _output, _error, limit):
+            limits["compile"] = limit
+            time.sleep(0.1)
+            return 0, 0.1, "", False
+
+        def run_source(_command, _cwd, _input, output, _error, limit):
+            limits["run"] = limit
+            output.write_text("H1:0,0\n0 H1 P1 H1\n", encoding="utf-8")
+            _error.write_text("", encoding="utf-8")
+            return 0, 0, "", False
+
+        with mock.patch("competition._execute", side_effect=compile_source), \
+             mock.patch("competition._execute_streaming", side_effect=run_source):
+            result = run_participant("Budget", source, self.instance, self.path / "r", 0.5, 0.5)
+        self.assertEqual((result["status"], result["score"]), ("Completed", 1))
+        self.assertLess(limits["run"], limits["compile"] - 0.08)
+        self.assertGreater(result["runtime_seconds"], 0.08)
+
+    def test_compilation_can_exhaust_total_budget_before_execution(self):
+        source = self.source("budget", "solver.c", "int main(void) { return 0; }\n")
+
+        def compile_source(*_args):
+            time.sleep(0.12)
+            return 0, 0.12, "", False
+
+        with mock.patch("competition._execute", side_effect=compile_source), \
+             mock.patch("competition._execute_streaming") as execute:
+            result = run_participant("Budget", source, self.instance, self.path / "r", 0.1, 0.1)
+        self.assertEqual((result["status"], result["score"]), ("Timeout", None))
+        self.assertIn("total limit", result["diagnostic"])
+        execute.assert_not_called()
 
     def test_timeout_scores_complete_lines_and_stops_program(self):
         marker = self.path / "should_not_exist"

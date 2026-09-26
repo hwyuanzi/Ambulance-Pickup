@@ -135,7 +135,33 @@ def _score_solution(instance, solution, result_dir):
     try:
         with contextlib.redirect_stdout(report):
             people, hospitals = read_data(instance)
-            rescued = readresults(people, hospitals, solution)
+            initial_ambulances = [len(h.amb_time) for h in hospitals]
+            trace = []
+            rescued = readresults(people, hospitals, solution, trace=trace)
+        rescued_at = {pid: trip["end"]["unload"] for trip in trace
+                      for pid in trip["rescued"]}
+        pickups = {}
+        for trip_index, trip in enumerate(trace):
+            for stop in trip["stops"]:
+                person = people[stop["patient"] - 1]
+                if (stop["pickup"] <= person.expires and person.pid not in pickups
+                        and stop["pickup"] <= rescued_at.get(person.pid, float("inf"))):
+                    pickups[person.pid] = (trip_index, stop["pickup"])
+        replay = {
+            "patients": [{"id": p.pid, "x": p.x, "y": p.y, "deadline": p.expires,
+                          "pickup_trip": pickups[p.pid][0] if p.pid in pickups else None,
+                          "pickup_at": pickups[p.pid][1] if p.pid in pickups else None,
+                          "rescued_at": rescued_at.get(p.pid),
+                          "death_at": None if p.pid in rescued_at else p.expires}
+                         for p in people],
+            "hospitals": [{"id": h.hid + 1, "x": h.x, "y": h.y,
+                           "ambulances": initial_ambulances[index]}
+                          for index, h in enumerate(hospitals)],
+            "trips": trace,
+        }
+        (result_dir / "replay.json").write_text(
+            json.dumps(replay, ensure_ascii=False) + "\n", encoding="utf-8"
+        )
         return sum(len(group) for group in rescued.values()), ""
     except (ValueError, IndexError, KeyError, TypeError, UnicodeError) as exc:
         return None, f"Invalid solution: {exc}"
@@ -182,7 +208,7 @@ def _prepare_instance(instance_argument, results_base):
     return results_dir, contest_instance
 
 
-def run_participant(name, source, instance, result_dir, timeout, compile_timeout):
+def run_participant(name, source, instance, result_dir, timeout, compile_timeout, on_phase=None):
     source = Path(source).resolve()
     result = {
         "participant": name,
@@ -204,6 +230,8 @@ def run_participant(name, source, instance, result_dir, timeout, compile_timeout
         result["diagnostic"] = f"Source file exceeds {MAX_SOURCE_BYTES} bytes"
         return result
 
+    started = time.monotonic()
+    deadline = started + timeout
     result_dir.mkdir(parents=True, exist_ok=False)
     with tempfile.TemporaryDirectory(prefix="ambulance-submission-") as temporary:
         workdir = Path(temporary)
@@ -214,26 +242,40 @@ def run_participant(name, source, instance, result_dir, timeout, compile_timeout
         build_command, run_command = _command(staged_source, workdir)
 
         if build_command:
+            if on_phase:
+                on_phase("Compiling")
             build_output = workdir / "build.stdout"
             build_error = workdir / "build.stderr"
             code, _, failure, timed_out = _execute(
-                build_command, workdir, staged_instance, build_output, build_error, compile_timeout
+                build_command, workdir, staged_instance, build_output, build_error,
+                min(compile_timeout, max(0, deadline - time.monotonic()))
             )
             if code != 0:
                 result["status"] = "Timeout" if timed_out else "Error"
                 result["diagnostic"] = "Compilation: " + (failure or _diagnostic(build_error) or f"exit code {code}")
+                result["runtime_seconds"] = round(time.monotonic() - started, 3)
                 (result_dir / "diagnostic.txt").write_text(result["diagnostic"], encoding="utf-8")
                 return result
 
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            result["status"] = "Timeout"
+            result["runtime_seconds"] = round(time.monotonic() - started, 3)
+            result["diagnostic"] = f"Exceeded {timeout:g} second total limit before execution"
+            (result_dir / "diagnostic.txt").write_text(result["diagnostic"], encoding="utf-8")
+            return result
+
+        if on_phase:
+            on_phase("Running")
         output = workdir / "solution.stdout"
         error = workdir / "program.stderr"
-        code, runtime, failure, timed_out = _execute_streaming(
-            run_command, workdir, staged_instance, output, error, timeout
+        code, _, failure, timed_out = _execute_streaming(
+            run_command, workdir, staged_instance, output, error, remaining
         )
-        result["runtime_seconds"] = round(runtime, 3)
+        result["runtime_seconds"] = round(time.monotonic() - started, 3)
         if timed_out:
             result["status"] = "Timeout"
-            result["diagnostic"] = failure
+            result["diagnostic"] = f"Exceeded {timeout:g} second total limit"
         elif code != 0:
             result["status"] = "Error"
             result["diagnostic"] = failure or _diagnostic(error) or f"Program exited with code {code}"
@@ -257,6 +299,8 @@ def run_participant(name, source, instance, result_dir, timeout, compile_timeout
                     shutil.copyfile(output, solution)
                 if solution.stat().st_size:
                     result["solution"] = str(solution)
+                    if on_phase:
+                        on_phase("Validating")
                     score, validation_error = _score_solution(instance, solution, result_dir)
                     result["score"] = score
                     if validation_error:
@@ -289,8 +333,8 @@ def main(argv=None):
     parser.add_argument("--participant", nargs=2, action="append", metavar=("NAME", "SOURCE"), required=True,
                         help="Repeat for each participant, in desired run order")
     parser.add_argument("--results-dir", type=Path, default=Path("Runs"))
-    parser.add_argument("--timeout", type=float, default=120, help="Seconds allowed per program (default: 120)")
-    parser.add_argument("--compile-timeout", type=float, default=30, help="Seconds allowed to compile (default: 30)")
+    parser.add_argument("--timeout", type=float, default=120, help="Total seconds allowed for compilation and execution per participant (default: 120)")
+    parser.add_argument("--compile-timeout", type=float, default=120, help="Optional compilation cap within the total time limit (default: 120)")
     args = parser.parse_args(argv)
     if args.timeout <= 0 or args.compile_timeout <= 0:
         parser.error("Time limits must be positive")

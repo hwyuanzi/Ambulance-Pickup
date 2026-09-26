@@ -63,7 +63,7 @@ start_minute start_hospital patient [patient ...] end_hospital
 
 For example, `5 H2 P2 H1` dispatches an ambulance from hospital 2 at minute 5, picks up patient 2, and unloads at hospital 1. List patients in pickup order. An ambulance can hold at most four living patients at any time; a patient who expires during transit no longer occupies a seat. Trip times and IDs are integers. See [`examples/reference_solution.txt`](examples/reference_solution.txt) for a larger plan.
 
-**The program has 120 seconds to run.** At the limit, the organizer stops it and scores the **complete, newline-terminated solution lines already printed**. Print all hospital placements before trips; without every hospital placement, the partial solution cannot be scored. Print each trip as soon as it is ready, end it with a newline, and flush standard output so it is available before the limit. The starter programs demonstrate this (`flush=True` in Python, `fflush(stdout)` in C, `std::endl` in C++, and `flush(stdout)` in Julia). An unfinished final line is discarded.
+**Each submission has 120 seconds total for compilation and execution.** At the limit, the organizer stops it and scores the **complete, newline-terminated solution lines already printed**. Print all hospital placements before trips; without every hospital placement, the partial solution cannot be scored. Print each trip as soon as it is ready, end it with a newline, and flush standard output so it is available before the limit. The starter programs demonstrate this (`flush=True` in Python, `fflush(stdout)` in C, `std::endl` in C++, and `flush(stdout)` in Julia). An unfinished final line is discarded.
 
 ### 4. Test your file before submitting
 
@@ -102,11 +102,37 @@ Email your **one `.py`, `.c`, `.cpp`, or `.jl` source file as an attachment** to
 
 The evaluator is [`validator.py`](validator.py), with travel and ambulance behavior in [`Infra/Hospital.py`](Infra/Hospital.py). These files define the precise scoring behavior.
 
-## Organizer: run submissions sequentially
+## Organizer: launch and operate the contest
 
-On the MacBook Pro used at the contest, install Python 3, the macOS command-line tools (`gcc` and `g++`), and Julia. Check availability with `python3 --version`, `gcc --version`, `g++ --version`, and `julia --version`. Run `competition.py` locally from Terminal; no server is needed. The runner uses only Python's standard library.
+The Competition Workbench runs locally on the organizer's MacBook Pro. Install Python 3 and the language tools needed for the submitted files: `gcc` for C, `g++` for C++, and Julia for `.jl` files. Check them in Terminal with `python3 --version`, `gcc --version`, `g++ --version`, and `julia --version`. The Workbench itself uses only Python's standard library; it needs no package installation, account, or internet connection.
 
-### Try a complete local contest
+### Launch the local Workbench
+
+1. Open Terminal and change to the repository directory, the folder containing `server.py` and `competition.py`. Replace the example path below with the folder's actual location:
+
+   ```sh
+   cd "/path/to/Ambulance-Pickup"
+   python3 server.py
+   ```
+
+2. Leave that Terminal window open while operating the contest.
+3. Open **http://127.0.0.1:8765/** in a browser on the same Mac. The server listens only on the local machine.
+
+If port 8765 is already in use, stop the old server with **Ctrl-C** in its Terminal window before starting a new one. To use another port instead, run `python3 server.py --port 8766` and open `http://127.0.0.1:8766/`. Restarting the server clears the current page's in-memory instance and participant list; completed reports remain in `Runs/`.
+
+### Operate the contest in the Workbench
+
+1. **Set the instance.** Paste the professor's patient rows into **Patient coordinates and deadlines** (`x,y,deadline`, one patient per line). Paste the five ambulance counts into **Ambulances per hospital** (one integer per line, in hospital order). If the professor supplied a combined TXT file, copy its patient section into the first box and its hospital section into the second; the section headers may be included or omitted. Click **Set instance**. Check the patient, hospital, and ambulance counts, then expand **View instance TXT** to inspect the exact input every submission will receive. Hospital coordinates are chosen by each submission, so they are not entered here.
+2. **Add participants.** Enter each team name and click **Add participant**, in the order the programs should run. In each row, click **Choose file** and select that team's single `.py`, `.c`, `.cpp`, or `.jl` source file. The row must show the filename, language, and **Ready** before starting. Click **Replace file** if a team sends a corrected file. Teams may use the same filename; their uploads remain separate. The page accepts source files, not folders, ZIP archives, executables, or JSON configuration.
+3. **Run sequentially.** Click **Run all** once every participant is ready. The Workbench runs one participant at a time against the same frozen instance. Each participant gets **120 seconds total for compilation and execution**. The rows show progress such as Waiting, Compiling, Running, and Validating. A failed or timed-out submission does not stop the next participant. Keep the server and browser open until every row finishes.
+4. **Reveal results.** After all runs finish, the **Leaderboard** shows rank, participant, score, runtime, and status. Valid plans rank by score; ties share a rank. Invalid and error results have no score. A timed-out program can receive a score for a valid, complete partial output.
+5. **Inspect replay and reports.** Select a **Completed** participant on the leaderboard to view that participant's hospital and patient grid. Use **Play**, the timeline, and the patient, hospital, and trip selectors to inspect the replay. Select an Invalid, Timeout, or Error participant to read its diagnostic. The validator determines scores and survival outcomes; the animated street path is illustrative because Manhattan travel time does not prescribe one unique path. Each contest writes its instance, outputs, `results.json`, validation reports, and replay data under `Runs/<run-id>/`.
+
+To run another contest instance, enter the new professor data and click **Set instance** again; this clears the current participants and results in the page. To rerun the same participants, click **Run all** again. To stop the website, press **Ctrl-C** in the server's Terminal window.
+
+For a practice run, use the ready-made [`examples/workbench_test_kit/`](examples/workbench_test_kit/) files. The kit provides separate patient and hospital inputs plus three single-file submissions. Expected results: Team Alpha scores 2, Team Beta scores 1, and Team Invalid receives no score. The CLI below is available if you prefer to operate the contest from Terminal.
+
+### CLI alternative: try a complete local contest
 
 From the repository root, **this command works as written** and runs all four supported languages on the same small instance:
 
@@ -158,7 +184,7 @@ You can also omit `pbpaste |`, run the command with `--instance -`, paste the fu
 
 If a downloaded filename or path contains spaces, put the whole path in quotes, for example `"./Team Alice.py"`.
 
-The default program time limit is 120 seconds; compilation has a separate 30-second limit. Override them with `--timeout SECONDS` and `--compile-timeout SECONDS`. At the run limit, the process is stopped and the validator scores its complete output lines. A valid partial solution gets a numeric score and ranking with status `Timeout`. Compilation failures, crashes, and invalid output have no score. The next team runs regardless of the previous team's status. The runner prints progress and the final ranking. It exits with code 1 when at least one team is `Invalid`, `Timeout`, or `Error`; the other teams' results are still saved.
+The default time limit is 120 seconds total per participant, including compilation and execution. `--timeout SECONDS` changes that total. `--compile-timeout SECONDS` optionally caps compilation within the same total; it does not grant extra execution time. At the limit, the process is stopped and the validator scores its complete output lines. A valid partial solution gets a numeric score and ranking with status `Timeout`. Compilation failures, crashes, and invalid output have no score. The next team runs regardless of the previous team's status. The runner prints progress and the final ranking. It exits with code 1 when at least one team is `Invalid`, `Timeout`, or `Error`; the other teams' results are still saved.
 
 Every invocation writes a new `Runs/<run-id>/` directory containing `instance.txt`, `results.json`, and each team's solution, validation report, and diagnostics when available. These fresh reports prevent an old output file from being mistaken for a new result.
 

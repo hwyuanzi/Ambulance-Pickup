@@ -19,7 +19,7 @@ class Hospital:
     def prettify(self):
         return {self.hid: (self.x, self.y)}
 
-    def rescue(self, pers, end_hospital, start_time):
+    def rescue(self, pers, end_hospital, start_time, trace=None):
         if len(self.amb_time) == 0:
             raise IllegalPlanError('No ambulance left at the hospital %s.' % self)
         else:
@@ -34,8 +34,12 @@ class Hospital:
         time = start_time
         location = self
         onboard = []
+        stops = []
         for p in pers:
-            time += take_time(location, p) + 1  # Travel, then one minute to pick up.
+            arrival = time + take_time(location, p)
+            time = arrival + 1  # Travel, then one minute to pick up.
+            stops.append({"patient": p.pid, "x": p.x, "y": p.y,
+                          "arrival": arrival, "pickup": time})
             onboard = [rider for rider in onboard if rider.expires >= time]
             if not p.rescued and p.expires >= time:
                 onboard.append(p)
@@ -43,7 +47,8 @@ class Hospital:
                 raise IllegalPlanError('Ignoring line as ambulance capacity is four living patients: %s.' % pers)
             location = p
 
-        rescue_end_time = time + take_time(location, end_hospital) + 1  # Unload.
+        hospital_arrival = time + take_time(location, end_hospital)
+        rescue_end_time = hospital_arrival + 1  # Unload.
 
         self.amb_time.sort()
         rescued_persons = list(set(filter(lambda p: p.expires >= rescue_end_time and p.rescued is False, pers)))
@@ -56,6 +61,14 @@ class Hospital:
 
         for (i,p) in enumerate(rescued_persons):
             p.rescued = True
+        if trace is not None:
+            trace.append({
+                "start": {"x": self.x, "y": self.y, "time": start_time},
+                "stops": stops,
+                "end": {"x": end_hospital.x, "y": end_hospital.y,
+                        "arrival": hospital_arrival, "unload": rescue_end_time},
+                "rescued": sorted(p.pid for p in rescued_persons),
+            })
         if len(rescued_persons)==0:
             print('Nobody will make it by end of %d minutes.' % rescue_end_time)
         else:

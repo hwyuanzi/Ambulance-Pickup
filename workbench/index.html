@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Ambulance Pickup</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <header class="topbar"><h1>Ambulance Pickup</h1></header>
+  <main>
+    <div id="message" role="alert" hidden></div>
+    <section class="panel" id="instance-panel">
+      <div class="section-head"><div><span class="step">01</span><h2>Instance</h2></div><span class="muted">Five hospitals · Patient count comes from the input</span></div>
+      <div class="input-grid">
+        <label>Patient coordinates and deadlines <small>One x,y,deadline per line</small><textarea id="patients" spellcheck="false" placeholder="0,1,10&#10;1,0,10"></textarea></label>
+        <label>Ambulances per hospital <small>One count per line, five lines total</small><textarea id="hospitals" spellcheck="false" placeholder="2&#10;1&#10;3&#10;1&#10;2"></textarea></label>
+      </div>
+      <div class="actions"><button id="set-instance" class="primary">Set instance</button><span id="instance-summary" class="muted">No instance loaded</span></div>
+      <details id="instance-text" hidden><summary>View instance TXT</summary><pre id="instance-txt"></pre></details>
+    </section>
+    <section class="panel" id="participants-panel">
+      <div class="section-head"><div><span class="step">02</span><h2>Participants</h2></div><span class="muted">One .py, .c, .cpp, or .jl file per participant</span></div>
+      <div class="actions"><input id="participant-name" type="text" placeholder="Participant or team name" aria-label="Participant name"><button id="add-participant">Add participant</button></div>
+      <div id="participants" class="participant-list"><p class="empty">Set an instance to add participants.</p></div>
+      <div class="runbar"><div><strong>Sequential run</strong><p>Each participant has 120 seconds total, including compilation and execution. Scores are revealed after all runs finish.</p></div><button id="run-all" class="primary" disabled>Run all</button></div>
+    </section>
+    <section class="panel" id="results-panel">
+      <div class="section-head"><div><span class="step">03</span><h2>Leaderboard</h2></div><span id="reveal-note" class="muted">Results appear after all runs finish</span></div>
+      <div class="table-wrap"><table><thead><tr><th>Rank</th><th>Participant</th><th>Score</th><th>Runtime</th><th>Status</th></tr></thead><tbody id="leaderboard"><tr><td colspan="5" class="empty">No participants yet</td></tr></tbody></table></div>
+    </section>
+    <section class="panel" id="replay-panel">
+      <div class="section-head"><div><span class="step">04</span><h2>Replay</h2></div><span class="muted">Select a participant from the leaderboard</span></div>
+      <div id="replay-placeholder" class="empty">After results are revealed, select a participant to see the grid replay or diagnostics.</div>
+      <div id="replay-content" hidden>
+        <div class="replay-heading"><div><h3 id="replay-name"></h3><p id="replay-meta"></p></div><div class="legend"><span><i class="dot yellow"></i>Alive</span><span><i class="dot green"></i>Rescued</span><span><i class="dot red"></i>Expired</span><span><i class="hospital-mark"></i>Hospital</span></div></div>
+        <div class="replay-layout"><div class="canvas-wrap"><canvas id="grid" width="900" height="600" aria-label="Patient and hospital replay grid"></canvas><p class="muted canvas-hint">Click a patient or hospital on the grid, or use the lists on the right.</p></div><aside><label>Patient<select id="patient-select"><option value="">Select patient</option></select></label><label>Hospital<select id="hospital-select"><option value="">Select hospital</option></select></label><label>Trip<select id="trip-select"><option value="">Select trip</option></select></label><div id="detail">Select a patient, hospital, or trip for details.</div></aside></div>
+        <div class="controls"><button id="play" aria-label="Play or pause">Play</button><input id="timeline" type="range" min="0" max="1" step="0.1" value="0" aria-label="Replay time"><span id="time-label">0 min</span><label>Speed <select id="speed"><option value="1">1×</option><option value="5" selected>5×</option><option value="15">15×</option></select></label></div>
+      </div>
+      <pre id="diagnostic" hidden></pre>
+    </section>
+  </main>
+</body>
+</html>
