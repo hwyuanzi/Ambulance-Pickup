@@ -61,7 +61,7 @@ H2:2,2
 start_minute start_hospital patient [patient ...] end_hospital
 ```
 
-For example, `5 H2 P2 H1` dispatches an ambulance from hospital 2 at minute 5, picks up patient 2, and unloads at hospital 1. List one to four patients per trip in pickup order. Trip times and IDs are integers. See [`Test/sample_result.txt`](Test/sample_result.txt) for a larger plan.
+For example, `5 H2 P2 H1` dispatches an ambulance from hospital 2 at minute 5, picks up patient 2, and unloads at hospital 1. List one to four patients per trip in pickup order. Trip times and IDs are integers. See [`examples/reference_solution.txt`](examples/reference_solution.txt) for a larger plan.
 
 **The program has 120 seconds to run.** At the limit, the organizer stops it and scores the **complete, newline-terminated solution lines already printed**. Print all hospital placements before trips; without every hospital placement, the partial solution cannot be scored. Print each trip as soon as it is ready, end it with a newline, and flush standard output so it is available before the limit. The starter programs demonstrate this (`flush=True` in Python, `fflush(stdout)` in C, `std::endl` in C++, and `flush(stdout)` in Julia). An unfinished final line is discarded.
 

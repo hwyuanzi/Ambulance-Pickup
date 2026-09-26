@@ -218,7 +218,7 @@ class CompetitionTests(unittest.TestCase):
     def test_original_2023_reference_still_scores_94(self):
         process = subprocess.run(
             [sys.executable, str(ROOT / "validator.py"), str(ROOT / "input_data.txt"),
-             str(ROOT / "Test/sample_result.txt")], capture_output=True, text=True, timeout=10,
+             str(ROOT / "examples/reference_solution.txt")], capture_output=True, text=True, timeout=10,
         )
         self.assertEqual(process.returncode, 0, process.stderr)
         self.assertIn("Total score: 94", process.stdout)

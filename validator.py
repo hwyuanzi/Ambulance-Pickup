@@ -27,7 +27,7 @@ def read_hospital(line, hospitals, placed_hospitals):
     hospitals[hospital_no - 1].y = y
     
 # read_results
-def readresults(persons, hospitals, fname='Outputs/sample_result.txt'):
+def readresults(persons, hospitals, fname):
     print('Reading data:', fname)
     res = {}
     score = 0
@@ -117,34 +117,14 @@ def readresults(persons, hospitals, fname='Outputs/sample_result.txt'):
     return res
 
 
-def my_solution(pers, hosps):
-    """
-    Place your custom solution here
-    Your code SHOULD create a result.txt file consisting of the solution as per the output format
-    As such, you do not need to read the data and can use the read_data() function directly.
-    However, you're free to read the data if you wish to use a separate data structure
-    IO Format:
-        Refer to the Readme: "For Languages other than python" to know the input and output formats
-    :return: Create a file named "result.txt" following the output format
-    """
-
-    # Enter your logic here
-
-    # with open("outputs/team_name.txt", "w+") as fil:
-    #     op = ""  # Change this to your solution
-    #     fil.write(op)
-    return
-
-
 # Main
 if __name__ == "__main__":
     input_file = "input_data.txt"
-    result_file = "Test/sample_result.txt" #Change here for custom validation of your solution
+    result_file = "examples/reference_solution.txt"
     if len(sys.argv) > 1:
         input_file = sys.argv[1]
     if len(sys.argv) > 2:
         result_file = sys.argv[2]
     print("Using " + input_file + " as input.\n")
     (persons, hospitals) = read_data(input_file)
-    my_solution(persons, hospitals)
     readresults(persons, hospitals, result_file)
