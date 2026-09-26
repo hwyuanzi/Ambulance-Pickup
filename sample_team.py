@@ -1,23 +1,34 @@
-import utils 
+"""Single-file Python submission for the 2023 Ambulance Pickup format."""
 
-def solution():
-    input_file = utils.read_data("input_data.txt", False)
-    lines = []
-    for i in range(1, 6):
-        lines.append("H" + str(i) + ":" + str(i * 10) + "," + str(i * 10))
-    lines.append("")
-    patient = 1
-    for i in range(1, 40):
-        pickups = 1
-        hospital = "H" + str((i % 5) + 1)
-        patients = ["P" + str(patient + z) for z in range(pickups)] 
-        patient += pickups
-        patient_string = " ".join(patients)
-        line = "0 " + hospital + " " + patient_string + " " + hospital
-        lines.append(line)
-    #print to output file
-    return "\n".join(lines)
+import sys
+
+
+def solve(lines):
+    patients = []
+    ambulances = []
+    section = None
+    for raw in lines:
+        line = raw.strip()
+        if not line:
+            continue
+        if line.startswith("person"):
+            section = "patients"
+        elif line.startswith("hospital"):
+            section = "hospitals"
+        elif section == "patients":
+            patients.append(tuple(map(int, line.split(","))))
+        elif section == "hospitals":
+            ambulances.append(int(line))
+
+    if not patients or not ambulances:
+        return
+    x, y, deadline = patients[0]
+    for number in range(1, len(ambulances) + 1):
+        print(f"H{number}:{x},{y}", flush=True)
+    first_available = next((number for number, count in enumerate(ambulances, 1) if count > 0), None)
+    if first_available is not None and deadline >= 2:
+        print(f"0 H{first_available} P1 H{first_available}", flush=True)
+
 
 if __name__ == "__main__":
-    result = solution()
-    print(result)
+    solve(sys.stdin)

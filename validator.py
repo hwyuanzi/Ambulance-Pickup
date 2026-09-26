@@ -1,22 +1,18 @@
 #!/usr/bin/env python
 
 import re
-import pandas as pd
 import sys
 from utils import read_data
 from Infra.exceptions import IllegalPlanError, FormatSyntaxError, ValidationError
 from Infra.Person import Person
 from Infra.Hospital import Hospital
 
-import matplotlib.pyplot as plt
-from matplotlib.ticker import (AutoMinorLocator, MultipleLocator)
-
 
 def read_hospital(line, hospitals, placed_hospitals):
     print("\n" + line, end=" ")
     hospital_no, hospital_coordinates = line.strip().replace('H', '').split(':')
     hospital_no = int(hospital_no)
-    if hospital_no > len(hospitals):
+    if hospital_no <= 0 or hospital_no > len(hospitals):
         raise ValidationError("Invalid Hospital Number - hospital number should be from 1 to " + str(len(hospitals)) + " line: "  + line)
     elif hospital_no in placed_hospitals:
         raise ValidationError("Hospital Number " + str(hospital_no) + " already placed with coordinates " + str(hospitals[hospital_no - 1].x) + "," + str(hospitals[hospital_no - 1].y) + " line: " + line)
@@ -47,6 +43,9 @@ def readresults(persons, hospitals, fname='Outputs/sample_result.txt'):
             line = line.strip()
             if not line:
                 data[i] = '0 .' + line
+
+    if len(placed_hospitals) != len(hospitals):
+        raise ValidationError('Every hospital must be placed exactly once before ambulance trips.')
 
 
     data.sort(key = lambda x: int(x.split()[0]))

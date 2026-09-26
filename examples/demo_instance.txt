@@ -1,0 +1,6 @@
+person(xloc,yloc,rescuetime)
+0,0,10
+1,0,10
+
+hospital(numambulance)
+1
