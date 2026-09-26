@@ -8,7 +8,7 @@ from Infra.Person import Person
 from Infra.Hospital import Hospital
 
 
-def read_hospital(line, hospitals, placed_hospitals):
+def read_hospital(line, persons, hospitals, placed_hospitals):
     print("\n" + line, end=" ")
     hospital_no, hospital_coordinates = line.strip().replace('H', '').split(':')
     hospital_no = int(hospital_no)
@@ -22,6 +22,8 @@ def read_hospital(line, hospitals, placed_hospitals):
         (x, y) = [int(coordinate) for coordinate in hospital_coordinates]
     except ValueError:
         raise ValidationError("Invalid Hospital Coordinates: " + line)
+    if any((person.x, person.y) == (x, y) for person in persons):
+        raise ValidationError("Hospital cannot be placed on a patient coordinate: " + line.strip())
     print("Hospital #{idx}: coordinates ({x},{y})".format(x=x, y=y, idx=hospital_no))
     hospitals[hospital_no - 1].x = x
     hospitals[hospital_no - 1].y = y
@@ -37,7 +39,7 @@ def readresults(persons, hospitals, fname):
     for (i, line) in enumerate(data):
         # check for hospital coordinates
         if line.startswith('H'):
-            read_hospital(line, hospitals, placed_hospitals)
+            read_hospital(line, persons, hospitals, placed_hospitals)
             data[i] = '0 .' + line
         else:
             line = line.strip()

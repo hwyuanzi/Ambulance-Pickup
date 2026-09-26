@@ -11,7 +11,7 @@ from utils import read_data
 
 
 ROOT = Path(__file__).resolve().parents[1]
-INSTANCE = "person(xloc,yloc,rescuetime)\n0,0,10\n1,0,10\n\nhospital(numambulance)\n1\n"
+INSTANCE = "person(xloc,yloc,rescuetime)\n0,1,10\n1,0,10\n\nhospital(numambulance)\n1\n"
 
 
 class CompetitionTests(unittest.TestCase):

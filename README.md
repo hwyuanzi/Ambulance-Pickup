@@ -49,19 +49,19 @@ Each patient line is `x,y,deadline`. `P1` means the first patient line, `P2` the
 Print your plan to **standard output**, and print nothing else there. Write debugging messages to standard error. First place every hospital exactly once, then list ambulance trips:
 
 ```text
-H1:1,1
-H2:2,2
+H1:0,0
+H2:0,1
 0 H1 P1 H1
 5 H2 P2 H1
 ```
 
-`H1:1,1` places hospital 1 at `(1,1)`. A trip is:
+`H1:0,0` places hospital 1 at `(0,0)`. Hospitals cannot be placed on patient coordinates. A trip is:
 
 ```text
 start_minute start_hospital patient [patient ...] end_hospital
 ```
 
-For example, `5 H2 P2 H1` dispatches an ambulance from hospital 2 at minute 5, picks up patient 2, and unloads at hospital 1. List one to four patients per trip in pickup order. Trip times and IDs are integers. See [`examples/reference_solution.txt`](examples/reference_solution.txt) for a larger plan.
+For example, `5 H2 P2 H1` dispatches an ambulance from hospital 2 at minute 5, picks up patient 2, and unloads at hospital 1. List patients in pickup order. An ambulance can hold at most four living patients at any time; a patient who expires during transit no longer occupies a seat. Trip times and IDs are integers. See [`examples/reference_solution.txt`](examples/reference_solution.txt) for a larger plan.
 
 **The program has 120 seconds to run.** At the limit, the organizer stops it and scores the **complete, newline-terminated solution lines already printed**. Print all hospital placements before trips; without every hospital placement, the partial solution cannot be scored. Print each trip as soon as it is ready, end it with a newline, and flush standard output so it is available before the limit. The starter programs demonstrate this (`flush=True` in Python, `fflush(stdout)` in C, `std::endl` in C++, and `flush(stdout)` in Julia). An unfinished final line is discarded.
 
@@ -93,9 +93,10 @@ Email your **one `.py`, `.c`, `.cpp`, or `.jl` source file as an attachment** to
 
 - Ambulances move on a Manhattan grid. Traveling one block takes one minute.
 - Picking up each patient takes one minute. Unloading a trip takes one minute.
-- One ambulance carries at most four patients per trip.
+- An ambulance carries at most four living patients at once. An onboard patient whose deadline passes during transit stops occupying a seat, so a trip may list more than four patients if capacity is never exceeded.
 - An ambulance starts at its hospital at minute 0. It may finish a trip at any hospital and can be used again after arriving there.
-- A patient counts as rescued if unloaded at a hospital at or before their deadline. A patient can score only once.
+- A patient counts as rescued if unloading finishes at a hospital at or before their deadline, including exactly at the deadline. A patient can score only once.
+- Placing a hospital at any patient coordinate makes the entire solution invalid.
 - **Score = number of rescued patients in the evaluated plan.** Higher scores rank first; equal scores share a rank. Runtime does not break ties. A timed-out program with a valid partial plan is ranked by its partial score.
 - A trip that violates the validator's action rules is reported and ignored where possible. A malformed solution that cannot be parsed receives no score.
 

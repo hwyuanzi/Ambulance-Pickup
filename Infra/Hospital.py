@@ -26,31 +26,30 @@ class Hospital:
             self.amb_time.sort()
             if self.amb_time[0] > start_time:
                 raise IllegalPlanError('No ambulance left at hospital %s at the start time %d minutes.' % (self, start_time))
-        if len(pers) > 4:
-            raise IllegalPlanError('Ignoring line as cannot rescue more than four people at once: %s.' % pers)
         already_rescued = list(filter(lambda p: p.rescued, pers))
         if already_rescued:
             print('Person %s already rescued.' % already_rescued)
-        # t: time when end hospital is reached
-        rescue_end_time = start_time + 1
-        start = self
+        # Only living people occupy seats. A patient remains alive through their
+        # expiration minute, including an unload completed at that minute.
+        time = start_time
+        location = self
+        onboard = []
         for p in pers:
-            rescue_end_time += take_time(start, p)
-            start = p
+            time += take_time(location, p) + 1  # Travel, then one minute to pick up.
+            onboard = [rider for rider in onboard if rider.expires >= time]
+            if not p.rescued and p.expires >= time:
+                onboard.append(p)
+            if len(onboard) > 4:
+                raise IllegalPlanError('Ignoring line as ambulance capacity is four living patients: %s.' % pers)
+            location = p
 
-        rescue_end_time += len(pers) #Add one minute pickup time per person
-        rescue_end_time += take_time(start, end_hospital) #Add time to reach end hospital
+        rescue_end_time = time + take_time(location, end_hospital) + 1  # Unload.
 
         self.amb_time.sort()
-        rescued_persons = []
-        for (index, t0) in enumerate(self.amb_time): #why not just take first one since it's sorted.
-            if (t0 > start_time):
-                continue
-            rescued_persons = list(set(filter(lambda p: p.expires >= rescue_end_time and p.rescued is False, pers)))
-            break
+        rescued_persons = list(set(filter(lambda p: p.expires >= rescue_end_time and p.rescued is False, pers)))
 
         #Update hosppitals
-        self.amb_time.pop(index)
+        self.amb_time.pop(0)
         end_hospital.amb_time.append(rescue_end_time)
 
         
