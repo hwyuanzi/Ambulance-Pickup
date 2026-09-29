@@ -63,9 +63,11 @@ class Hospital:
             p.rescued = True
         if trace is not None:
             trace.append({
-                "start": {"x": self.x, "y": self.y, "time": start_time},
+                "start": {"hospital": self.hid + 1, "x": self.x, "y": self.y,
+                          "time": start_time},
                 "stops": stops,
-                "end": {"x": end_hospital.x, "y": end_hospital.y,
+                "end": {"hospital": end_hospital.hid + 1,
+                        "x": end_hospital.x, "y": end_hospital.y,
                         "arrival": hospital_arrival, "unload": rescue_end_time},
                 "rescued": sorted(p.pid for p in rescued_persons),
             })

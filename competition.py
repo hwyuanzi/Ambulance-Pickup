@@ -140,6 +140,9 @@ def _score_solution(instance, solution, result_dir):
             rescued = readresults(people, hospitals, solution, trace=trace)
         rescued_at = {pid: trip["end"]["unload"] for trip in trace
                       for pid in trip["rescued"]}
+        rescued_by_hospital = {h.hid + 1: 0 for h in hospitals}
+        for trip in trace:
+            rescued_by_hospital[trip["end"]["hospital"]] += len(trip["rescued"])
         pickups = {}
         for trip_index, trip in enumerate(trace):
             for stop in trip["stops"]:
@@ -155,7 +158,8 @@ def _score_solution(instance, solution, result_dir):
                           "death_at": None if p.pid in rescued_at else p.expires}
                          for p in people],
             "hospitals": [{"id": h.hid + 1, "x": h.x, "y": h.y,
-                           "ambulances": initial_ambulances[index]}
+                           "ambulances": initial_ambulances[index],
+                           "rescued_count": rescued_by_hospital[h.hid + 1]}
                           for index, h in enumerate(hospitals)],
             "trips": trace,
         }

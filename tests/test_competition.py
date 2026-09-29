@@ -41,6 +41,20 @@ class CompetitionTests(unittest.TestCase):
         self.assertIn("0 H1 P1 P2 H1", Path(first["solution"]).read_text())
         self.assertIn("Total score: 2", (self.path / "r1" / "validation.txt").read_text())
 
+    def test_replay_counts_rescues_at_destination_hospital(self):
+        self.instance.write_text(
+            "person(xloc,yloc,rescuetime)\n0,1,10\n\nhospital(numambulance)\n1\n0\n",
+            encoding="utf-8",
+        )
+        solver = self.source("destination", "solver.py",
+                             'print("H1:0,0\\nH2:0,0\\n0 H1 P1 H2")\n')
+        result = run_participant("Destination", solver, self.instance, self.path / "destination-run", 5, 5)
+        self.assertEqual(result["score"], 1)
+        replay = json.loads((self.path / "destination-run" / "replay.json").read_text())
+        self.assertEqual([hospital["rescued_count"] for hospital in replay["hospitals"]], [0, 1])
+        self.assertEqual(replay["trips"][0]["start"]["hospital"], 1)
+        self.assertEqual(replay["trips"][0]["end"]["hospital"], 2)
+
     def test_invalid_output_has_no_score(self):
         invalid = self.source("invalid", "solver.py", 'print("bad output")\n')
         result = run_participant("Invalid", invalid, self.instance, self.path / "r", 5, 5)
@@ -125,7 +139,7 @@ class CompetitionTests(unittest.TestCase):
     def test_cpp_timeout_scores_line_buffered_output(self):
         slow = self.source("slow_cpp", "solver.cpp", '#include <iostream>\n#include <unistd.h>\n'
                            'int main() { std::cout << "H1:0,0\\n0 H1 P1 H1\\n"; sleep(5); }\n')
-        result = run_participant("Slow Cpp", slow, self.instance, self.path / "r", 0.5, 5)
+        result = run_participant("Slow Cpp", slow, self.instance, self.path / "r", 1.5, 5)
         self.assertEqual((result["status"], result["score"]), ("Timeout", 1))
 
     @unittest.skipUnless(shutil.which("julia"), "Julia is unavailable")

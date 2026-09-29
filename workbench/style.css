@@ -150,6 +150,45 @@ input[type=range] { accent-color: #2d70c0; }
 #participants-panel > .actions input { grid-column: 1; }
 #add-participant { grid-column: 2; }
 
+/* Replay map controls and readable status markers. */
+.legend .blue { background: #1475bb; }
+.legend .yellow { background: #d99a00; }
+.legend .green { background: #20a568; }
+.legend .red { background: #dc4b51; }
+.map-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 0 3px 9px;
+  min-height: 30px;
+}
+.map-buttons { display: flex; gap: 5px; flex: none; margin-left: auto; }
+.highlight-note { display: inline-flex; align-items: center; gap: 5px; color: #6033ae; font-size: 12px; font-weight: 700; }
+.highlight-note[hidden] { display: none; }
+.highlight-note::before { content: ""; width: 10px; height: 10px; border: 2px solid #6937bf; border-radius: 50%; background: #fff; }
+.map-buttons button { padding: 4px 9px; min-width: 29px; font-size: 13px; }
+#grid { background: white; border-radius: 6px; cursor: grab; touch-action: none; }
+#grid:active { cursor: grabbing; }
+.canvas-hint { line-height: 1.4; }
+#detail { min-height: 95px; }
+.hospital-stats { margin: -2px 0 14px; }
+.hospital-stats p { margin: 0 0 5px; color: #607187; font-size: 12px; font-weight: 600; }
+.hospital-stats button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  margin: 3px 0;
+  padding: 4px 8px;
+  border-radius: 7px;
+  font-size: 12px;
+  text-align: left;
+}
+.hospital-stats button.selected { border-color: #397dd3; background: #e5f0ff; }
+.hospital-stats strong { color: #215b9e; font-weight: 700; }
+
 @media (max-width: 480px) {
   #instance-panel .actions,
   #participants-panel > .actions { margin-right: 0; }
