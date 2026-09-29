@@ -40,7 +40,7 @@ def _command(source, workdir):
     if extension == ".py":
         return None, [sys.executable, str(source)]
     if extension == ".jl":
-        return None, ["julia", "--startup-file=no", str(source)]
+        return None, ["julia", "-t", "auto", "--startup-file=no", str(source)]
     executable = workdir / "submission"
     if extension == ".c":
         return ["gcc", "-O2", "-std=c11", str(source), "-o", str(executable)], [str(executable)]

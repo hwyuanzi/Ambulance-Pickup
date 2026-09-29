@@ -24,7 +24,7 @@ The organizer runs each file in its own temporary working directory using these 
 | Python | `python3 submission.py` (the Python interpreter running `competition.py`) |
 | C | `gcc -O2 -std=c11 submission.c -o submission`, then `./submission` |
 | C++ | `g++ -O2 -std=c++17 submission.cpp -o submission`, then `./submission` |
-| Julia | `julia --startup-file=no submission.jl` |
+| Julia | `julia -t auto --startup-file=no submission.jl` |
 
 Source files must be at most 2,000,000 bytes. Standard output must be at most 5,000,000 bytes. No command-line arguments or environment variables are needed for the input: read standard input or the provided `input_data.txt` file.
 
