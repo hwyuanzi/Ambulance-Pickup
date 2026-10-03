@@ -2,6 +2,50 @@
 
 Build a program that places hospitals and plans ambulance trips to rescue as many patients as possible before their deadlines. Each team emails **one source file** to the organizer, Haowen Yuan ([haowen.yuan@nyu.edu](mailto:haowen.yuan@nyu.edu)). The organizer runs the submitted programs sequentially on the same instance and displays their scores.
 
+## Repository structure map
+
+```text
+Ambulance-Pickup/
+├── README.md                         # Contest rules and operating instructions
+├── competition.py                    # Compile, run, score, and rank submissions
+├── server.py                         # Local Competition Workbench HTTP server
+├── validator.py                      # Parse solutions and evaluate rescue plans
+├── utils.py                          # Parse patient and hospital instance data
+├── sample_team.py                    # Single-file Python starter program
+├── input_data.txt                    # Combined instance in runner input format
+├── Input.txt                         # Additional supplied instance data
+├── Infra/                            # Simulation models and rule exceptions
+│   ├── Hospital.py                   # Ambulance trips, timing, and rescue behavior
+│   ├── Person.py                     # Patient coordinates and deadlines
+│   └── exceptions.py                 # Simulation rule errors
+├── workbench/                        # Browser interface served by server.py
+│   ├── index.html                    # Contest controls, leaderboard, and replay
+│   ├── app.js                        # UI behavior and replay visualization
+│   └── style.css                     # Workbench styling
+├── Ambulance_Pickup_Contester_Solutions/
+│   ├── Emil.py                       # Submitted contestant programs
+│   ├── Keefer.py
+│   ├── Sarp.py
+│   ├── Shela.py
+│   ├── Stephen.jl
+│   ├── Swapnil.cpp
+│   └── Zonghao.py
+├── examples/                         # Starters, demo instances, and sample plans
+│   ├── sample.c / sample.cpp / sample.jl
+│   ├── reference_solution.txt
+│   ├── demo_*.py / demo_instance.txt  # Success, invalid-output, and timeout demos
+│   ├── workbench_demo_alpha.py
+│   ├── workbench_demo_instance.txt
+│   └── workbench_test_kit/            # Ready-to-run inputs and three test teams
+├── tests/                            # Automated regression tests
+│   ├── test_competition.py            # Submission runner and ranking
+│   ├── test_rules.py                  # Input parsing and scoring rules
+│   └── test_server.py                 # Workbench server behavior
+└── Runs/                             # Generated contest reports (Git-ignored)
+```
+
+`server.py` serves `workbench/` and uses `competition.py` to run submissions. The runner evaluates each plan through `validator.py`, which uses the models in `Infra/`. `Runs/` is created when a contest runs.
+
 ## Getting started: contestants
 
 ### 1. Write one program
